@@ -462,7 +462,7 @@ ZEND_END_ARG_INFO()
 const zend_function_entry memprof_functions[] = {
     PHP_FE(memprof_dump_callgrind, arginfo_memprof_dump_callgrind)
     PHP_FE(memprof_dump_array, arginfo_memprof_dump_array)
-	PHP_FE_END	/* Must be the last line in memprof_functions[] */
+    PHP_FE_END    /* Must be the last line in memprof_functions[] */
 };
 /* }}} */
 
@@ -470,19 +470,19 @@ const zend_function_entry memprof_functions[] = {
  */
 zend_module_entry memprof_module_entry = {
 #if ZEND_MODULE_API_NO >= 20010901
-	STANDARD_MODULE_HEADER,
+    STANDARD_MODULE_HEADER,
 #endif
-	MEMPROF_NAME,
-	memprof_functions,
-	PHP_MINIT(memprof),
-	PHP_MSHUTDOWN(memprof),
-	PHP_RINIT(memprof),		/* Replace with NULL if there's nothing to do at request start */
-	PHP_RSHUTDOWN(memprof),	/* Replace with NULL if there's nothing to do at request end */
-	PHP_MINFO(memprof),
+    MEMPROF_NAME,
+    memprof_functions,
+    PHP_MINIT(memprof),
+    PHP_MSHUTDOWN(memprof),
+    PHP_RINIT(memprof),        /* Replace with NULL if there's nothing to do at request start */
+    PHP_RSHUTDOWN(memprof),    /* Replace with NULL if there's nothing to do at request end */
+    PHP_MINFO(memprof),
 #if ZEND_MODULE_API_NO >= 20010901
-	MEMPROF_VERSION,
+    MEMPROF_VERSION,
 #endif
-	STANDARD_MODULE_PROPERTIES
+    STANDARD_MODULE_PROPERTIES
 };
 /* }}} */
 
@@ -515,9 +515,9 @@ static void php_memprof_init_globals(zend_memprof_globals *memprof_globals)
 PHP_MINIT_FUNCTION(memprof)
 {
     /* ZEND_INIT_MODULE_GLOBALS(memprof, php_memprof_init_globals, memprof_globals); */
-	/* If you have INI entries, uncomment these lines 
-	REGISTER_INI_ENTRIES();
-	*/
+    /* If you have INI entries, uncomment these lines 
+    REGISTER_INI_ENTRIES();
+    */
 
     if (!memprof_initialized) {
         zend_error(E_CORE_ERROR, "memprof must be loaded as a Zend extension (zend_extension=/path/to/memprof.so)");
@@ -533,7 +533,7 @@ PHP_MINIT_FUNCTION(memprof)
     zend_execute = memprof_zend_execute;
     zend_execute_internal = memprof_zend_execute_internal;
 
-	return SUCCESS;
+    return SUCCESS;
 }
 /* }}} */
 
@@ -541,14 +541,14 @@ PHP_MINIT_FUNCTION(memprof)
  */
 PHP_MSHUTDOWN_FUNCTION(memprof)
 {
-	/* uncomment this line if you have INI entries
-	UNREGISTER_INI_ENTRIES();
-	*/
+    /* uncomment this line if you have INI entries
+    UNREGISTER_INI_ENTRIES();
+    */
 
     zend_execute_internal = old_zend_execute_internal;
     zend_execute = old_zend_execute;
 
-	return SUCCESS;
+    return SUCCESS;
 }
 /* }}} */
 
@@ -559,7 +559,7 @@ PHP_RINIT_FUNCTION(memprof)
 {
     track_mallocs = 1;
 
-	return SUCCESS;
+    return SUCCESS;
 }
 /* }}} */
 
@@ -574,7 +574,7 @@ PHP_RSHUTDOWN_FUNCTION(memprof)
     init_frame(&default_frame, NULL);
     default_frame.calls = 1;
 
-	return SUCCESS;
+    return SUCCESS;
 }
 /* }}} */
 
@@ -582,13 +582,13 @@ PHP_RSHUTDOWN_FUNCTION(memprof)
  */
 PHP_MINFO_FUNCTION(memprof)
 {
-	php_info_print_table_start();
-	php_info_print_table_header(2, "memprof support", "enabled");
-	php_info_print_table_end();
+    php_info_print_table_start();
+    php_info_print_table_header(2, "memprof support", "enabled");
+    php_info_print_table_end();
 
-	/* Remove comments if you have entries in php.ini
-	DISPLAY_INI_ENTRIES();
-	*/
+    /* Remove comments if you have entries in php.ini
+    DISPLAY_INI_ENTRIES();
+    */
 }
 /* }}} */
 
@@ -780,6 +780,7 @@ PHP_FUNCTION(memprof_dump_array)
 
     RETURN_ZVAL(ret, 0, 0);
 }
+/* }}} */
 
 /* {{{ proto void memprof_dump_callgrind(resource handle)
    Dumps current memory usage in callgrind format to stream $handle */
@@ -810,6 +811,7 @@ PHP_FUNCTION(memprof_dump_callgrind)
 
     } END_WITHOUT_MALLOC_TRACKING;
 }
+/* }}} */
 
 
 /*
@@ -817,6 +819,6 @@ PHP_FUNCTION(memprof_dump_callgrind)
  * tab-width: 4
  * c-basic-offset: 4
  * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
+ * vim600: et sw=4 ts=4 fdm=marker
+ * vim<600: et sw=4 ts=4
  */
