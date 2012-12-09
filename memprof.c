@@ -34,7 +34,7 @@
 #error "ZTS build not supported"
 #endif
 
-#define MEMPROF_DEBUG 1
+#define MEMPROF_DEBUG 0
 
 typedef LIST_HEAD(_alloc_list_head, _alloc) alloc_list_head;
 
