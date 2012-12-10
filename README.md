@@ -25,7 +25,8 @@ In script 1, a before/after approach would designate file_get_contents() as huge
 memory consumer, while the memory it allocates is actually freed quickly after
 it returns. When dumping the memory usage after a() returns, the memprof
 approach would show that file_get_contents() is a small memory consumer since
-the memory it allocated has been freed at the time a() has returned.
+the memory it allocated has been freed at the time memprof_dump_array() is
+called.
 
 
 ``` php
@@ -44,8 +45,8 @@ $profile = memprof_dump_array();
 ```
 
 In script 2, the allocated memory remains allocated after file_get_contents()
-and a() return. This time a() and file_get_contents() are shown as huge memory
-consumers.
+and a() return, and when memprof_dump_array() is called. This time a() and
+file_get_contents() are shown as huge memory consumers.
 
 ## Install
 
@@ -75,12 +76,15 @@ Example:
 The memory usage can be dumped by calling the memprof_dump_array() or
 memprof_dump_callgrind() functions.
 
+Both tell which functions allocated all the currently allocated memory.
+
 ### memprof_dump_callgrind
 
 The memprof_dump_callgrind function dumps the current memory usage to a stream
 in callgrind format. The file can then be read with tools such as
-[KCacheGrind][2] or [WebGrind][3]. Xdebug lists other tools capable of reading
-callgrind files: http://xdebug.org/docs/profiler
+[KCacheGrind][2]. Xdebug lists other tools capable of reading
+callgrind files: http://xdebug.org/docs/profiler, although they may only work
+with xdebug output files.
 
 ``` php
 <?php
@@ -192,5 +196,4 @@ Example output:
 
 [1]: https://www.gnu.org/software/libc/manual/html_node/Hooks-for-Malloc.html#Hooks-for-Malloc
 [2]: http://kcachegrind.sourceforge.net/html/Home.html
-[3]: http://xdebug.org/docs/profiler
 
