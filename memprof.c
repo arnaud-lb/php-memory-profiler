@@ -21,6 +21,7 @@
 #endif
 
 #include "php.h"
+#include "SAPI.h"
 #include "php_ini.h"
 #include "ext/standard/info.h"
 #include "php_memprof.h"
@@ -519,6 +520,10 @@ PHP_MINIT_FUNCTION(memprof)
     REGISTER_INI_ENTRIES();
     */
 
+    if (0 != strcmp(sapi_module.name, "cli")) {
+        zend_error(E_CORE_ERROR, "memprof supports only CLI mode at the moment");
+        return FAILURE;
+    }
     if (!memprof_initialized) {
         zend_error(E_CORE_ERROR, "memprof must be loaded as a Zend extension (zend_extension=/path/to/memprof.so)");
         return FAILURE;
