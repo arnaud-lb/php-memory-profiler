@@ -47,6 +47,8 @@ PHP_MINFO_FUNCTION(memprof);
 
 PHP_FUNCTION(memprof_dump_callgrind);
 PHP_FUNCTION(memprof_dump_array);
+PHP_FUNCTION(memprof_memory_get_usage);
+PHP_FUNCTION(memprof_memory_get_peak_usage);
 
 /*
 ZEND_BEGIN_MODULE_GLOBALS(memprof)

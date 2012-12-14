@@ -80,6 +80,11 @@ static int memprof_initialized = 0;
 static int malloc_init_hook_called = 0;
 static int track_mallocs = 0;
 
+static size_t memory_usage = 0;
+static size_t memory_usage_real = 0;
+static size_t memory_usage_peak = 0;
+static size_t memory_usage_peak_real = 0;
+
 static frame default_frame;
 static frame * current_frame = &default_frame;
 static alloc_list_head * current_alloc_list = &default_frame.allocs;
@@ -216,6 +221,24 @@ static frame * get_or_create_frame(zend_execute_data * current_execute_data, fra
     return f;
 }
 
+static void incr_memory_usage(size_t size, size_t real_size)
+{
+    memory_usage += size;
+    memory_usage_real += real_size;
+    if (memory_usage_peak < memory_usage) {
+        memory_usage_peak = memory_usage;
+    }
+    if (memory_usage_peak_real < memory_usage_real) {
+        memory_usage_peak_real = memory_usage_real;
+    }
+}
+
+static void decr_memory_usage(size_t size, size_t real_size)
+{
+    memory_usage -= size;
+    memory_usage_real -= real_size;
+}
+
 #define MALLOC_HOOK_RESTORE_OLD() \
     /* Restore all old hooks */ \
     __malloc_hook = old_malloc_hook; \
@@ -273,6 +296,7 @@ static void * malloc_hook(size_t size, const void *caller)
     } else {
         result = malloc(block_size);
         if (result != NULL) {
+            incr_memory_usage(size, block_size);
             ALLOC_INIT((alloc*)result, size);
             if (track_mallocs) {
                 ALLOC_LIST_INSERT_HEAD(current_alloc_list, (alloc*)result);
@@ -302,20 +326,21 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
         if (ptr != NULL) {
             ALLOC_CHECK(ALLOC_BLOCK(ptr));
             ALLOC_LIST_REMOVE(ALLOC_BLOCK(ptr));
+            decr_memory_usage(ALLOC_BLOCK(ptr)->size, ALLOC_SIZE(ALLOC_BLOCK(ptr)->size));
         }
+
         result = realloc(ptr ? ALLOC_BLOCK(ptr) : NULL, block_size);
         if (result != NULL) {
-            if (ptr != NULL) {
-                ALLOC_CHECK((alloc*)result);
-            }
             /* succeeded; add result */
             ALLOC_INIT((alloc*)result, size);
             if (track_mallocs) {
                 ALLOC_LIST_INSERT_HEAD(current_alloc_list, (alloc*)result);
             }
+            incr_memory_usage(size, block_size);
             ALLOC_CHECK((alloc*)result);
             result = ALLOC_DATA(result);
         } else if (ptr != NULL) {
+            incr_memory_usage(size, block_size);
             ALLOC_CHECK(ALLOC_BLOCK(ptr));
             if (track_mallocs) {
                 /* failed, re-add ptr, since it hasn't been freed */
@@ -336,10 +361,15 @@ static void free_hook(void *ptr, const void *caller)
     MALLOC_HOOK_RESTORE_OLD();
 
     if (ptr != NULL) {
+        size_t size = ALLOC_BLOCK(ptr)->size;
+        size_t block_size = ALLOC_SIZE(ALLOC_BLOCK(ptr)->size);
         ALLOC_CHECK(ALLOC_BLOCK(ptr));
         ALLOC_LIST_REMOVE(ALLOC_BLOCK(ptr));
+#if MEMPROF_DEBUG
         memset(ALLOC_BLOCK(ptr), 0, ALLOC_SIZE(ALLOC_BLOCK(ptr)->size));
+#endif
         free(ALLOC_BLOCK(ptr));
+        decr_memory_usage(size, block_size);
     }
 
     MALLOC_HOOK_SAVE_OLD();
@@ -409,6 +439,9 @@ ZEND_DLEXPORT int memprof_zend_startup(zend_extension *extension)
 
     memprof_initialized = 1;
 
+    zend_hash_del(CG(function_table), "memory_get_usage", sizeof("memory_get_usage"));
+    zend_hash_del(CG(function_table), "memory_get_peak_usage", sizeof("memory_get_peak_usage"));
+
     ret = zend_startup_module(&memprof_module_entry);
 
     if (-1 == zend_get_resource_handle(extension)) {
@@ -463,6 +496,10 @@ ZEND_END_ARG_INFO()
 const zend_function_entry memprof_functions[] = {
     PHP_FE(memprof_dump_callgrind, arginfo_memprof_dump_callgrind)
     PHP_FE(memprof_dump_array, arginfo_memprof_dump_array)
+    PHP_FE(memprof_memory_get_usage, NULL)
+    PHP_FE(memprof_memory_get_peak_usage, NULL)
+    PHP_FALIAS(memory_get_usage, memprof_memory_get_usage, NULL)
+    PHP_FALIAS(memory_get_peak_usage, memprof_memory_get_peak_usage, NULL)
     PHP_FE_END    /* Must be the last line in memprof_functions[] */
 };
 /* }}} */
@@ -818,6 +855,33 @@ PHP_FUNCTION(memprof_dump_callgrind)
 }
 /* }}} */
 
+/* {{{ proto void memprof_memory_get_usage(bool real)
+   Returns the current memory usage */
+PHP_FUNCTION(memprof_memory_get_usage)
+{
+    zend_bool real = 0;
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|b", &real) == FAILURE) {
+        return;
+    }
+
+    RETURN_LONG(real ? memory_usage_real : memory_usage);
+}
+/* }}} */
+
+/* {{{ proto void memprof_memory_get_peak_usage(bool real)
+   Returns the peak memory usage */
+PHP_FUNCTION(memprof_memory_get_peak_usage)
+{
+    zend_bool real = 0;
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|b", &real) == FAILURE) {
+        return;
+    }
+
+    RETURN_LONG(real ? memory_usage_peak_real : memory_usage_peak);
+}
+/* }}} */
 
 /*
  * Local variables:
