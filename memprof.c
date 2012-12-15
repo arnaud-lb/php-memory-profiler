@@ -688,12 +688,11 @@ static void frame_inclusive_cost(frame * f, size_t * inclusive_size, size_t * in
     *inclusive_count = count;
 }
 
-static zval * dump_frame_array(frame * f)
+static void dump_frame_array(zval * dest, frame * f)
 {
-    zval * z;
     HashPosition pos;
     frame ** next_pp;
-    zval * zframe;
+    zval * zframe = dest;
     zval * zcalled_functions;
     alloc * alloc;
     size_t alloc_size = 0;
@@ -701,10 +700,6 @@ static zval * dump_frame_array(frame * f)
     size_t inclusive_size;
     size_t inclusive_count;
 
-    MAKE_STD_ZVAL(z);
-    array_init(z);
-
-    MAKE_STD_ZVAL(zframe);
     array_init(zframe);
 
     LIST_FOREACH(alloc, &f->allocs, list) {
@@ -738,13 +733,12 @@ static zval * dump_frame_array(frame * f)
             continue;
         }
 
-        zcalled_function = dump_frame_array(*next_pp);
+        MAKE_STD_ZVAL(zcalled_function);
+        dump_frame_array(zcalled_function, *next_pp);
         add_assoc_zval_ex(zcalled_functions, str_key, str_key_len, zcalled_function);
 
         zend_hash_move_forward_ex(&f->next_cache, &pos);
     }
-
-    return zframe;
 }
 
 static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, size_t * inclusive_size, size_t * inclusive_count)
@@ -825,19 +819,15 @@ static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, s
    Returns current memory usage as an array */
 PHP_FUNCTION(memprof_dump_array)
 {
-    zval * ret;
-
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "") == FAILURE) {
         return;
     }
 
     WITHOUT_MALLOC_TRACKING {
 
-        ret = dump_frame_array(&default_frame);
+        dump_frame_array(return_value, &default_frame);
 
     } END_WITHOUT_MALLOC_TRACKING;
-
-    RETURN_ZVAL(ret, 0, 0);
 }
 /* }}} */
 
