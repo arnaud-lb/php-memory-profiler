@@ -64,9 +64,7 @@ file_get_contents() are shown as huge memory consumers.
 
 The extension must be loaded as a zend_extension:
 
-    USE_ZEND_ALLOC=0 php -dzend_extension=/absolute/path/to/memprof.so script.php
-
-Note that the zend memory allocator must be disabled, else the extension won't see actual memory allocations (hence the USE_ZEND_ALLOC=0).
+    php -dzend_extension=/absolute/path/to/memprof.so script.php
 
 ## Usage
 

@@ -87,6 +87,9 @@ static frame * current_frame = &default_frame;
 static alloc_list_head * current_alloc_list = &default_frame.allocs;
 
 static Pvoid_t allocs_set = (Pvoid_t) NULL;
+static Pvoid_t zend_allocs_set = (Pvoid_t) NULL;
+
+static zend_mm_heap * orig_heap = NULL;
 
 /* ZEND_DECLARE_MODULE_GLOBALS(memprof) */
 
@@ -238,22 +241,22 @@ static void decr_memory_usage(size_t size, size_t real_size)
     memory_usage_real -= real_size;
 }
 
-static void mark_own_alloc(void * ptr)
+static void mark_own_alloc(Pvoid_t * set, void * ptr)
 {
     int ret;
-    J1S(ret, allocs_set, (Word_t)ptr);
+    J1S(ret, *set, (Word_t)ptr);
 }
 
-static void unmark_own_alloc(void * ptr)
+static void unmark_own_alloc(Pvoid_t * set, void * ptr)
 {
     int ret;
-    J1U(ret, allocs_set, (Word_t)ptr);
+    J1U(ret, *set, (Word_t)ptr);
 }
 
-int is_own_alloc(void * ptr)
+int is_own_alloc(Pvoid_t * set, void * ptr)
 {
     int ret;
-    J1T(ret, allocs_set, (Word_t)ptr);
+    J1T(ret, *set, (Word_t)ptr);
     return ret;
 }
 
@@ -307,7 +310,7 @@ static void * malloc_hook(size_t size, const void *caller)
             }
             ALLOC_CHECK((alloc*)result);
             result = ALLOC_DATA(result);
-            mark_own_alloc(result);
+            mark_own_alloc(&allocs_set, result);
         }
     }
 
@@ -324,7 +327,7 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
 
     MALLOC_HOOK_RESTORE_OLD();
 
-    if (ptr != NULL && !is_own_alloc(ptr)) {
+    if (ptr != NULL && !is_own_alloc(&allocs_set, ptr)) {
         result = realloc(ptr, size);
     } else if (0 == (block_size = ALLOC_SIZE(size))) {
         result = NULL;
@@ -334,7 +337,7 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
             ALLOC_CHECK(ALLOC_BLOCK(ptr));
             ALLOC_LIST_REMOVE(ALLOC_BLOCK(ptr));
             decr_memory_usage(ALLOC_BLOCK(ptr)->size, ALLOC_SIZE(ALLOC_BLOCK(ptr)->size));
-            unmark_own_alloc(ptr);
+            unmark_own_alloc(&allocs_set, ptr);
         }
 
         result = realloc(ptr ? ALLOC_BLOCK(ptr) : NULL, block_size);
@@ -347,7 +350,7 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
             incr_memory_usage(size, block_size);
             ALLOC_CHECK((alloc*)result);
             result = ALLOC_DATA(result);
-            mark_own_alloc(result);
+            mark_own_alloc(&allocs_set, result);
         } else if (ptr != NULL) {
             incr_memory_usage(size, block_size);
             ALLOC_CHECK(ptr);
@@ -356,7 +359,7 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
                 ALLOC_LIST_INSERT_HEAD(current_alloc_list, ALLOC_BLOCK(ptr));
             }
             ALLOC_CHECK(ALLOC_BLOCK(ptr));
-            mark_own_alloc(ptr);
+            mark_own_alloc(&allocs_set, ptr);
         }
     }
 
@@ -371,7 +374,7 @@ static void free_hook(void *ptr, const void *caller)
     MALLOC_HOOK_RESTORE_OLD();
 
     if (ptr != NULL) {
-        if (!is_own_alloc(ptr)) {
+        if (!is_own_alloc(&allocs_set, ptr)) {
             free(ptr);
         } else {
             size_t size = ALLOC_BLOCK(ptr)->size;
@@ -383,7 +386,7 @@ static void free_hook(void *ptr, const void *caller)
 #endif
             free(ALLOC_BLOCK(ptr));
             decr_memory_usage(size, block_size);
-            unmark_own_alloc(ptr);
+            unmark_own_alloc(&allocs_set, ptr);
         }
     }
 
@@ -395,6 +398,53 @@ static void * memalign_hook(size_t alignment, size_t size, const void *caller)
 {
     /* TODO: would require special handling in free and realloc */
     return malloc_hook(size, caller);
+}
+
+void * zend_malloc_handler(size_t size)
+{
+    void * result = malloc(size);
+    if (result) {
+        mark_own_alloc(&zend_allocs_set, result);
+    }
+    return result;
+}
+
+void zend_free_handler(void * ptr)
+{
+    if (!ptr) {
+        return;
+    }
+
+    if (is_own_alloc(&zend_allocs_set, ptr)) {
+        free(ptr);
+        unmark_own_alloc(&zend_allocs_set, ptr);
+    } else {
+        zend_mm_heap * heap = zend_mm_set_heap(orig_heap);
+        zend_mm_free(heap, ptr);
+        zend_mm_set_heap(heap);
+    }
+}
+
+void * zend_realloc_handler(void * ptr, size_t size)
+{
+    if (!ptr) {
+        return zend_malloc_handler(size);
+    }
+
+    if (is_own_alloc(&zend_allocs_set, ptr)) {
+        void * result;
+        result = realloc(ptr, size);
+        if (result && result != ptr) {
+            unmark_own_alloc(&zend_allocs_set, ptr);
+            mark_own_alloc(&zend_allocs_set, result);
+        }
+        return result;
+    } else {
+        zend_mm_heap * heap = zend_mm_set_heap(orig_heap);
+        void * result = zend_mm_realloc(heap, ptr, size);
+        zend_mm_set_heap(heap);
+        return result;
+    }
 }
 
 static void memprof_zend_execute(zend_op_array *op_array TSRMLS_DC)
@@ -453,6 +503,12 @@ ZEND_DLEXPORT int memprof_zend_startup(zend_extension *extension)
     int ret;
 
     memprof_initialized = 1;
+
+    if (is_zend_mm()) {
+        zend_mm_heap * heap = zend_mm_startup();
+        zend_mm_set_custom_handlers(heap, zend_malloc_handler, zend_free_handler, zend_realloc_handler);
+        orig_heap = zend_mm_set_heap(heap);
+    }
 
     init_frame(&default_frame, NULL);
     default_frame.calls = 1;
