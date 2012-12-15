@@ -30,6 +30,7 @@
 #include <stdint.h>
 #include <sys/queue.h>
 #include "util.h"
+#include <Judy.h>
 
 #ifdef ZTS
 #error "ZTS build not supported"
@@ -59,7 +60,6 @@ typedef struct _alloc {
 #endif
 } alloc;
 
-static void malloc_init_hook();
 static void * malloc_hook(size_t size, const void *caller);
 static void * realloc_hook(void *ptr, size_t size, const void *caller);
 static void free_hook(void *ptr, const void *caller);
@@ -73,11 +73,8 @@ static void * (*old_memalign_hook) (size_t alignment, size_t size, const void *c
 static void (*old_zend_execute)(zend_op_array *op_array TSRMLS_DC);
 static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, int return_value_used TSRMLS_DC);
 
-void (*__malloc_initialize_hook) (void) = malloc_init_hook;
-
 static int memprof_reserved_offset;
 static int memprof_initialized = 0;
-static int malloc_init_hook_called = 0;
 static int track_mallocs = 0;
 
 static size_t memory_usage = 0;
@@ -88,6 +85,8 @@ static size_t memory_usage_peak_real = 0;
 static frame default_frame;
 static frame * current_frame = &default_frame;
 static alloc_list_head * current_alloc_list = &default_frame.allocs;
+
+static Pvoid_t allocs_set = (Pvoid_t) NULL;
 
 /* ZEND_DECLARE_MODULE_GLOBALS(memprof) */
 
@@ -239,6 +238,25 @@ static void decr_memory_usage(size_t size, size_t real_size)
     memory_usage_real -= real_size;
 }
 
+static void mark_own_alloc(void * ptr)
+{
+    int ret;
+    J1S(ret, allocs_set, (Word_t)ptr);
+}
+
+static void unmark_own_alloc(void * ptr)
+{
+    int ret;
+    J1U(ret, allocs_set, (Word_t)ptr);
+}
+
+int is_own_alloc(void * ptr)
+{
+    int ret;
+    J1T(ret, allocs_set, (Word_t)ptr);
+    return ret;
+}
+
 #define MALLOC_HOOK_RESTORE_OLD() \
     /* Restore all old hooks */ \
     __malloc_hook = old_malloc_hook; \
@@ -270,20 +288,6 @@ static void decr_memory_usage(size_t size, size_t real_size)
     track_mallocs = ___old_track_mallocs; \
 } while (0)
 
-static void malloc_init_hook()
-{
-    malloc_init_hook_called = 1;
-
-    putenv("LD_PRELOAD=");
-    putenv("USE_ZEND_ALLOC=0");
-
-    init_frame(&default_frame, NULL);
-    default_frame.calls = 1;
-
-    MALLOC_HOOK_SAVE_OLD();
-    MALLOC_HOOK_SET_OWN();
-}
-
 static void * malloc_hook(size_t size, const void *caller)
 {
     void *result;
@@ -303,6 +307,7 @@ static void * malloc_hook(size_t size, const void *caller)
             }
             ALLOC_CHECK((alloc*)result);
             result = ALLOC_DATA(result);
+            mark_own_alloc(result);
         }
     }
 
@@ -319,7 +324,9 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
 
     MALLOC_HOOK_RESTORE_OLD();
 
-    if (0 == (block_size = ALLOC_SIZE(size))) {
+    if (ptr != NULL && !is_own_alloc(ptr)) {
+        result = realloc(ptr, size);
+    } else if (0 == (block_size = ALLOC_SIZE(size))) {
         result = NULL;
     } else {
         /* ptr may be freed by realloc, so we must remove it from list now */
@@ -327,6 +334,7 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
             ALLOC_CHECK(ALLOC_BLOCK(ptr));
             ALLOC_LIST_REMOVE(ALLOC_BLOCK(ptr));
             decr_memory_usage(ALLOC_BLOCK(ptr)->size, ALLOC_SIZE(ALLOC_BLOCK(ptr)->size));
+            unmark_own_alloc(ptr);
         }
 
         result = realloc(ptr ? ALLOC_BLOCK(ptr) : NULL, block_size);
@@ -339,14 +347,16 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
             incr_memory_usage(size, block_size);
             ALLOC_CHECK((alloc*)result);
             result = ALLOC_DATA(result);
+            mark_own_alloc(result);
         } else if (ptr != NULL) {
             incr_memory_usage(size, block_size);
-            ALLOC_CHECK(ALLOC_BLOCK(ptr));
+            ALLOC_CHECK(ptr);
             if (track_mallocs) {
                 /* failed, re-add ptr, since it hasn't been freed */
                 ALLOC_LIST_INSERT_HEAD(current_alloc_list, ALLOC_BLOCK(ptr));
             }
             ALLOC_CHECK(ALLOC_BLOCK(ptr));
+            mark_own_alloc(ptr);
         }
     }
 
@@ -361,15 +371,20 @@ static void free_hook(void *ptr, const void *caller)
     MALLOC_HOOK_RESTORE_OLD();
 
     if (ptr != NULL) {
-        size_t size = ALLOC_BLOCK(ptr)->size;
-        size_t block_size = ALLOC_SIZE(ALLOC_BLOCK(ptr)->size);
-        ALLOC_CHECK(ALLOC_BLOCK(ptr));
-        ALLOC_LIST_REMOVE(ALLOC_BLOCK(ptr));
+        if (!is_own_alloc(ptr)) {
+            free(ptr);
+        } else {
+            size_t size = ALLOC_BLOCK(ptr)->size;
+            size_t block_size = ALLOC_SIZE(ALLOC_BLOCK(ptr)->size);
+            ALLOC_CHECK(ALLOC_BLOCK(ptr));
+            ALLOC_LIST_REMOVE(ALLOC_BLOCK(ptr));
 #if MEMPROF_DEBUG
-        memset(ALLOC_BLOCK(ptr), 0, ALLOC_SIZE(ALLOC_BLOCK(ptr)->size));
+            memset(ALLOC_BLOCK(ptr), 0, ALLOC_SIZE(ALLOC_BLOCK(ptr)->size));
 #endif
-        free(ALLOC_BLOCK(ptr));
-        decr_memory_usage(size, block_size);
+            free(ALLOC_BLOCK(ptr));
+            decr_memory_usage(size, block_size);
+            unmark_own_alloc(ptr);
+        }
     }
 
     MALLOC_HOOK_SAVE_OLD();
@@ -438,6 +453,12 @@ ZEND_DLEXPORT int memprof_zend_startup(zend_extension *extension)
     int ret;
 
     memprof_initialized = 1;
+
+    init_frame(&default_frame, NULL);
+    default_frame.calls = 1;
+
+    MALLOC_HOOK_SAVE_OLD();
+    MALLOC_HOOK_SET_OWN();
 
     zend_hash_del(CG(function_table), "memory_get_usage", sizeof("memory_get_usage"));
     zend_hash_del(CG(function_table), "memory_get_peak_usage", sizeof("memory_get_peak_usage"));
@@ -563,10 +584,6 @@ PHP_MINIT_FUNCTION(memprof)
     }
     if (!memprof_initialized) {
         zend_error(E_CORE_ERROR, "memprof must be loaded as a Zend extension (zend_extension=/path/to/memprof.so)");
-        return FAILURE;
-    }
-    if (!malloc_init_hook_called) {
-        zend_error(E_CORE_ERROR, "malloc init hook has not been called; make sure to preload memprof (e.g. LD_PRELOAD)");
         return FAILURE;
     }
 

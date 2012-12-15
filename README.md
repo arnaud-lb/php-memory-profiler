@@ -58,18 +58,15 @@ file_get_contents() are shown as huge memory consumers.
 ## Dependencies
 
  * C Library with [malloc hooks][1]
+ * [Judy Libray][3] (e.g. libjudy-dev package)
 
 ## Loading the extension
 
-The extension must be loaded in a special way to make it work properly:
+The extension must be loaded as a zend_extension:
 
- * it must be preloaded with LD_PRELOAD or equivalent (compiling it statically
-   in PHP, or linking PHP to the extension may work too).
- * it must also be loaded as a zend_extension
+    USE_ZEND_ALLOC=0 php -dzend_extension=/absolute/path/to/memprof.so script.php
 
-Example:
-
-    LD_PRELOAD=/absolute/path/to/memprof.so php -dzend_extension=/absolute/path/to/memprof.so script.php
+Note that the zend memory allocator must be disabled, else the extension won't see actual memory allocations (hence the USE_ZEND_ALLOC=0).
 
 ## Usage
 
@@ -186,14 +183,10 @@ Example output:
 
  * Only tested in command line; may not work in CGI or server modules
  * Only tested on Linux boxes; may not compile elsewhere
- * Make it work without LD_PRELOAD: the extension currently takes profit of the
-   fact that it sees every single malloc() since the existance of the process,
-   which simplies handling of free and realloc. Hooking later requires to be
-   able to recognize if blocks were allocated by the extension in free and
-   realloc.
  * Make it work without disabling the Zend memory allocator; or implement
-   memory_limit and memory_get_usage()
+   memory_limit
 
 [1]: https://www.gnu.org/software/libc/manual/html_node/Hooks-for-Malloc.html#Hooks-for-Malloc
 [2]: http://kcachegrind.sourceforge.net/html/Home.html
+[3]: http://judy.sourceforge.net/index.html
 
