@@ -87,7 +87,9 @@ memprof_dump_callgrind(fopen("output", "w"));
 ?>
 ```
 
-This is probably the best way to visualize memory usage.
+Here is a KcacheGrind screenshot:
+
+![KCacheGrind screenshot](http://img820.imageshack.us/img820/5530/screenshot3kve.png)
 
 ### memprof_dump_array
 
