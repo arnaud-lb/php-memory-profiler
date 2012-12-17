@@ -530,6 +530,12 @@ ZEND_DLEXPORT int memprof_zend_startup(zend_extension *extension)
     return ret;
 }
 
+ZEND_DLEXPORT void memprof_zend_shutdown(zend_extension *extension)
+{
+    /* avoids dlunload, since malloc hooks are still set */
+    extension->handle = NULL;
+}
+
 ZEND_DLEXPORT void memprof_init_oparray(zend_op_array *op_array)
 {   
     TSRMLS_FETCH();
@@ -548,7 +554,7 @@ ZEND_DLEXPORT zend_extension zend_extension_entry = {
     "https://github.com/arnaud-lb/php-memprof",
     "Copyright (c) 2012",
     memprof_zend_startup,
-    NULL,
+    memprof_zend_shutdown,
     NULL,           /* activate_func_t */
     NULL,           /* deactivate_func_t */
     NULL,           /* message_handler_func_t */
