@@ -62,9 +62,15 @@ file_get_contents() are shown as huge memory consumers.
 
 ## Loading the extension
 
-The extension must be loaded as a zend_extension:
+The extension must be loaded as a zend_extension.
+
+It can be loaded on the command line, just for one script:
 
     php -dzend_extension=/absolute/path/to/memprof.so script.php
+
+Or permanently, in php.ini:
+
+    zend_extension=/absolute/path/to/memprof.so
 
 ## Usage
 
@@ -181,8 +187,7 @@ Example output:
 
 ## Todo
 
- * Only tested in command line; may not work in CGI or server modules
- * Only tested on Linux boxes; may not compile elsewhere
+ * Make it work with non-glibc
  * Make it work without disabling the Zend memory allocator; or implement
    memory_limit
 
