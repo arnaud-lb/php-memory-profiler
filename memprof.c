@@ -534,6 +534,22 @@ ZEND_DLEXPORT void memprof_zend_shutdown(zend_extension *extension)
 {
     /* avoids dlunload, since malloc hooks are still set */
     extension->handle = NULL;
+
+    destroy_frame(&default_frame);
+
+    Judy1FreeArray(&allocs_set, PJE0);
+    Judy1FreeArray(&zend_allocs_set, PJE0);
+
+    if (orig_heap) {
+        zend_mm_heap * heap;
+        heap = zend_mm_set_heap(orig_heap);
+
+#if 0
+        /* hack to re-set ->use_zend_alloc to 1 */
+        *(int*)heap = 1;
+#endif
+        zend_mm_shutdown(heap, 1, 1);
+    }
 }
 
 ZEND_DLEXPORT void memprof_init_oparray(zend_op_array *op_array)
