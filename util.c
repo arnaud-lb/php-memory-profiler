@@ -13,6 +13,8 @@ void stream_printf(php_stream * stream, const char * format, ...)
     va_end(ap);
 
     php_stream_write(stream, buf, len);
+
+    free(buf);
 }
 
 size_t get_function_name(zend_execute_data * execute_data, char * buf, size_t buf_size)
