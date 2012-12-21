@@ -104,7 +104,6 @@ static frame * current_frame = &default_frame;
 static alloc_list_head * current_alloc_list = &default_frame.allocs;
 
 static Pvoid_t allocs_set = (Pvoid_t) NULL;
-static Pvoid_t zend_allocs_set = (Pvoid_t) NULL;
 
 static zend_mm_heap * orig_heap = NULL;
 
@@ -429,11 +428,7 @@ static memprof_used void * memalign_hook(size_t alignment, size_t size, const vo
 
 void * zend_malloc_handler(size_t size)
 {
-    void * result = malloc_hook(size, NULL);
-    if (result) {
-        mark_own_alloc(&zend_allocs_set, result);
-    }
-    return result;
+    return malloc_hook(size, NULL);
 }
 
 void zend_free_handler(void * ptr)
@@ -442,9 +437,8 @@ void zend_free_handler(void * ptr)
         return;
     }
 
-    if (is_own_alloc(&zend_allocs_set, ptr)) {
+    if (is_own_alloc(&allocs_set, ptr)) {
         free_hook(ptr, NULL);
-        unmark_own_alloc(&zend_allocs_set, ptr);
     } else {
         zend_mm_heap * heap = zend_mm_set_heap(orig_heap);
         zend_mm_free(heap, ptr);
@@ -458,14 +452,8 @@ void * zend_realloc_handler(void * ptr, size_t size)
         return zend_malloc_handler(size);
     }
 
-    if (is_own_alloc(&zend_allocs_set, ptr)) {
-        void * result;
-        result = realloc_hook(ptr, size, NULL);
-        if (result && result != ptr) {
-            unmark_own_alloc(&zend_allocs_set, ptr);
-            mark_own_alloc(&zend_allocs_set, result);
-        }
-        return result;
+    if (is_own_alloc(&allocs_set, ptr)) {
+        return realloc_hook(ptr, size, NULL);
     } else {
         zend_mm_heap * heap = zend_mm_set_heap(orig_heap);
         void * result = zend_mm_realloc(heap, ptr, size);
@@ -564,8 +552,8 @@ ZEND_DLEXPORT void memprof_zend_shutdown(zend_extension *extension)
 
     destroy_frame(&default_frame);
 
-    Judy1FreeArray(&allocs_set, PJE0);
-    Judy1FreeArray(&zend_allocs_set, PJE0);
+    /* this is still needed, so we can't free it */
+    /* Judy1FreeArray(&allocs_set, PJE0); */
 
     if (orig_heap) {
         zend_mm_heap * heap;
