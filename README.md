@@ -57,8 +57,8 @@ file_get_contents() are shown as huge memory consumers.
 
 ## Dependencies
 
- * C Library with [malloc hooks][1]
  * [Judy Libray][3] (e.g. libjudy-dev package)
+ * C Library with [malloc hooks][1] (optional; allows to track persistent allocations too)
 
 ## Loading the extension
 
@@ -187,7 +187,8 @@ Example output:
 
 ## Todo
 
- * Make it work with non-glibc
+ * Support for tracking persistent (non-zend-alloc) allocations when libc
+   doesn't have malloc hooks
  * Make it work without disabling the Zend memory allocator; or implement
    memory_limit
 

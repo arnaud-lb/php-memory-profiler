@@ -25,7 +25,6 @@
 #include "php_ini.h"
 #include "ext/standard/info.h"
 #include "php_memprof.h"
-#include "malloc.h"
 #include "zend_extensions.h"
 #include <stdint.h>
 #include <sys/queue.h>
@@ -37,6 +36,22 @@
 #endif
 
 #define MEMPROF_DEBUG 0
+
+#if MEMPROF_CONFIGURE_VERSION != 2
+# error Please rebuild configure (run phpize and reconfigure)
+#endif
+
+#if HAVE_MALLOC_HOOKS
+# include <malloc.h>
+#else
+# warning No support for malloc hooks, this build will not track persistent allocations
+#endif
+
+#ifdef __GNUC__
+# define memprof_used __attribute__((used))
+#else
+# define memprof_used
+#endif
 
 typedef LIST_HEAD(_alloc_list_head, _alloc) alloc_list_head;
 
@@ -60,6 +75,7 @@ typedef struct _alloc {
 #endif
 } alloc;
 
+#if HAVE_MALLOC_HOOKS
 static void * malloc_hook(size_t size, const void *caller);
 static void * realloc_hook(void *ptr, size_t size, const void *caller);
 static void free_hook(void *ptr, const void *caller);
@@ -69,6 +85,7 @@ static void * (*old_malloc_hook) (size_t size, const void *caller) = NULL;
 static void * (*old_realloc_hook) (void *ptr, size_t size, const void *caller) = NULL;
 static void (*old_free_hook) (void *ptr, const void *caller) = NULL;
 static void * (*old_memalign_hook) (size_t alignment, size_t size, const void *caller) = NULL;
+#endif
 
 static void (*old_zend_execute)(zend_op_array *op_array TSRMLS_DC);
 static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, int return_value_used TSRMLS_DC);
@@ -260,6 +277,8 @@ int is_own_alloc(Pvoid_t * set, void * ptr)
     return ret;
 }
 
+#if HAVE_MALLOC_HOOKS
+
 #define MALLOC_HOOK_RESTORE_OLD() \
     /* Restore all old hooks */ \
     __malloc_hook = old_malloc_hook; \
@@ -280,6 +299,14 @@ int is_own_alloc(Pvoid_t * set, void * ptr)
     __free_hook = free_hook; \
     __realloc_hook = realloc_hook; \
     __memalign_hook = memalign_hook; \
+
+#else /* HAVE_MALLOC_HOOKS */
+
+#define MALLOC_HOOK_RESTORE_OLD()
+#define MALLOC_HOOK_SAVE_OLD()
+#define MALLOC_HOOK_SET_OWN()
+
+#endif
 
 #define WITHOUT_MALLOC_TRACKING do { \
     int ___old_track_mallocs = track_mallocs; \
@@ -394,7 +421,7 @@ static void free_hook(void *ptr, const void *caller)
     MALLOC_HOOK_SET_OWN();
 }
 
-static void * memalign_hook(size_t alignment, size_t size, const void *caller)
+static memprof_used void * memalign_hook(size_t alignment, size_t size, const void *caller)
 {
     /* TODO: would require special handling in free and realloc */
     return malloc_hook(size, caller);
@@ -402,7 +429,7 @@ static void * memalign_hook(size_t alignment, size_t size, const void *caller)
 
 void * zend_malloc_handler(size_t size)
 {
-    void * result = malloc(size);
+    void * result = malloc_hook(size, NULL);
     if (result) {
         mark_own_alloc(&zend_allocs_set, result);
     }
@@ -416,7 +443,7 @@ void zend_free_handler(void * ptr)
     }
 
     if (is_own_alloc(&zend_allocs_set, ptr)) {
-        free(ptr);
+        free_hook(ptr, NULL);
         unmark_own_alloc(&zend_allocs_set, ptr);
     } else {
         zend_mm_heap * heap = zend_mm_set_heap(orig_heap);
@@ -433,7 +460,7 @@ void * zend_realloc_handler(void * ptr, size_t size)
 
     if (is_own_alloc(&zend_allocs_set, ptr)) {
         void * result;
-        result = realloc(ptr, size);
+        result = realloc_hook(ptr, size, NULL);
         if (result && result != ptr) {
             unmark_own_alloc(&zend_allocs_set, ptr);
             mark_own_alloc(&zend_allocs_set, result);
