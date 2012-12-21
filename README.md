@@ -48,17 +48,17 @@ In script 2, the allocated memory remains allocated after file_get_contents()
 and a() return, and when memprof_dump_array() is called. This time a() and
 file_get_contents() are shown as huge memory consumers.
 
+## Dependencies
+
+ * [Judy Libray][3] (e.g. libjudy-dev or judy package)
+ * C Library with [malloc hooks][1] (optional; allows to track persistent allocations too)
+
 ## Install
 
     phpize
     ./configure
     make
     make install
-
-## Dependencies
-
- * [Judy Libray][3] (e.g. libjudy-dev package)
- * C Library with [malloc hooks][1] (optional; allows to track persistent allocations too)
 
 ## Loading the extension
 
