@@ -352,10 +352,10 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
             result = ALLOC_DATA(result);
             mark_own_alloc(&allocs_set, result);
         } else if (ptr != NULL) {
-            incr_memory_usage(size, block_size);
+            /* failed, re-add ptr, since it hasn't been freed */
+            incr_memory_usage(size, ALLOC_SIZE(ALLOC_BLOCK(ptr)->size));
             ALLOC_CHECK(ptr);
             if (track_mallocs) {
-                /* failed, re-add ptr, since it hasn't been freed */
                 ALLOC_LIST_INSERT_HEAD(current_alloc_list, ALLOC_BLOCK(ptr));
             }
             ALLOC_CHECK(ALLOC_BLOCK(ptr));
