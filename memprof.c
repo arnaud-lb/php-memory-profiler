@@ -57,6 +57,8 @@ typedef LIST_HEAD(_alloc_list_head, _alloc) alloc_list_head;
 
 /* a call frame */
 typedef struct _frame {
+    char * name;
+    size_t name_len;
     struct _frame * prev;
     size_t calls;
     HashTable next_cache;
@@ -187,6 +189,8 @@ static void destroy_frame(frame * f)
 {
     alloc * a;
 
+    free(f->name);
+
     while (f->allocs.lh_first) {
         a = f->allocs.lh_first;
         ALLOC_CHECK(a);
@@ -204,18 +208,21 @@ static void frame_dtor(void * pDest)
     free(f);
 }
 
-static void init_frame(frame * f, frame * prev)
+static void init_frame(frame * f, frame * prev, char * name, size_t name_len)
 {
     zend_hash_init(&f->next_cache, 0, NULL, frame_dtor, 0);
+    f->name = malloc(name_len+1);
+    memcpy(f->name, name, name_len+1);
+    f->name_len = name_len;
     f->calls = 0;
     f->prev = prev;
     LIST_INIT(&f->allocs);
 }
 
-static frame * new_frame(frame * prev)
+static frame * new_frame(frame * prev, char * name, size_t name_len)
 {
     frame * f = malloc(sizeof(*f));
-    init_frame(f, prev);
+    init_frame(f, prev, name, name_len);
     return f;
 }
 
@@ -232,11 +239,35 @@ static frame * get_or_create_frame(zend_execute_data * current_execute_data, fra
     if (SUCCESS == zend_hash_find(&prev->next_cache, name, name_len+1, (void**) &f_pp)) {
         f = *f_pp;
     } else {
-        f = new_frame(prev);
+        f = new_frame(prev, name, name_len);
         zend_hash_add(&prev->next_cache, name, name_len+1, &f, sizeof(f), NULL);
     }
 
     return f;
+}
+
+static size_t frame_alloc_size(const frame * f)
+{
+    size_t size = 0;
+    alloc * alloc;
+
+    LIST_FOREACH(alloc, &f->allocs, list) {
+        size += alloc->size;
+    }
+
+    return size;
+}
+
+static int frame_stack_depth(const frame * f)
+{
+    const frame * prev;
+    int depth = 0;
+
+    for (prev = f; prev; prev = prev->prev) {
+        depth ++;
+    }
+
+    return depth;
 }
 
 static void incr_memory_usage(size_t size, size_t real_size)
@@ -525,7 +556,7 @@ ZEND_DLEXPORT int memprof_zend_startup(zend_extension *extension)
         orig_heap = zend_mm_set_heap(heap);
     }
 
-    init_frame(&default_frame, NULL);
+    init_frame(&default_frame, NULL, "root", sizeof("root")-1);
     default_frame.calls = 1;
 
     MALLOC_HOOK_SAVE_OLD();
@@ -602,6 +633,10 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_memprof_dump_callgrind, 0, 0, 1)
     ZEND_ARG_INFO(0, handle)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memprof_dump_pprof, 0, 0, 1)
+    ZEND_ARG_INFO(0, handle)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_memprof_dump_array, 0, 0, 0)
 ZEND_END_ARG_INFO()
 
@@ -609,6 +644,7 @@ ZEND_END_ARG_INFO()
  */
 const zend_function_entry memprof_functions[] = {
     PHP_FE(memprof_dump_callgrind, arginfo_memprof_dump_callgrind)
+    PHP_FE(memprof_dump_pprof, arginfo_memprof_dump_pprof)
     PHP_FE(memprof_dump_array, arginfo_memprof_dump_array)
     PHP_FE(memprof_memory_get_usage, NULL)
     PHP_FE(memprof_memory_get_peak_usage, NULL)
@@ -719,7 +755,7 @@ PHP_RSHUTDOWN_FUNCTION(memprof)
     track_mallocs = 0;
 
     destroy_frame(&default_frame);
-    init_frame(&default_frame, NULL);
+    init_frame(&default_frame, NULL, "root", sizeof("root")-1);
     default_frame.calls = 1;
 
     return SUCCESS;
@@ -904,6 +940,73 @@ static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, s
     }
 }
 
+static void dump_frames_pprof(php_stream * stream, HashTable * symbols, frame * f)
+{
+    HashPosition pos;
+    frame * prev;
+    frame ** next_pp;
+    size_t size = frame_alloc_size(f);
+    size_t stack_depth = frame_stack_depth(f);
+
+    if (0 < size) {
+        stream_write_word(stream, size);
+        stream_write_word(stream, stack_depth);
+
+        for (prev = f; prev; prev = prev->prev) {
+            zend_uintptr_t * symaddr_p;
+            if (zend_hash_find(symbols, prev->name, prev->name_len+1, (void**) &symaddr_p) != SUCCESS) {
+                /* shouldn't happen */
+                zend_error_noreturn(E_CORE_ERROR, "symbol address not found");
+            }
+            stream_write_word(stream, *symaddr_p);
+        }
+    }
+
+    zend_hash_internal_pointer_reset_ex(&f->next_cache, &pos);
+    while (zend_hash_get_current_data_ex(&f->next_cache, (void **)&next_pp, &pos) == SUCCESS) {
+        char * str_key;
+        uint str_key_len;
+        ulong num_key;
+
+        if (HASH_KEY_IS_STRING != zend_hash_get_current_key_ex(&f->next_cache, &str_key, &str_key_len, &num_key, 0, &pos)) {
+            continue;
+        }
+
+        dump_frames_pprof(stream, symbols, *next_pp);
+
+        zend_hash_move_forward_ex(&f->next_cache, &pos);
+    }
+}
+
+static void dump_frames_pprof_symbols(php_stream * stream, HashTable * symbols, frame * f)
+{
+    HashPosition pos;
+    frame ** next_pp;
+    zend_uintptr_t symaddr;
+
+    if (!zend_hash_exists(symbols, f->name, f->name_len+1)) {
+        /* addr only has to be unique */
+        symaddr = (symbols->nNumOfElements+1)<<3;
+        zend_hash_add(symbols, f->name, f->name_len+1, &symaddr, sizeof(symaddr), NULL);
+        stream_printf(stream, "0x%0*x %s\n", sizeof(symaddr)*2, symaddr, f->name);
+    }
+
+    zend_hash_internal_pointer_reset_ex(&f->next_cache, &pos);
+    while (zend_hash_get_current_data_ex(&f->next_cache, (void **)&next_pp, &pos) == SUCCESS) {
+        char * str_key;
+        uint str_key_len;
+        ulong num_key;
+
+        if (HASH_KEY_IS_STRING != zend_hash_get_current_key_ex(&f->next_cache, &str_key, &str_key_len, &num_key, 0, &pos)) {
+            continue;
+        }
+
+        dump_frames_pprof_symbols(stream, symbols, *next_pp);
+
+        zend_hash_move_forward_ex(&f->next_cache, &pos);
+    }
+}
+
 /* {{{ proto void memprof_dump_array(void)
    Returns current memory usage as an array */
 PHP_FUNCTION(memprof_dump_array)
@@ -946,6 +1049,51 @@ PHP_FUNCTION(memprof_dump_callgrind)
         dump_frame_callgrind(stream, &default_frame, "root", &total_size, &total_count);
 
         stream_printf(stream, "total: %zu %zu\n", total_size, total_count);
+
+    } END_WITHOUT_MALLOC_TRACKING;
+}
+/* }}} */
+
+/* {{{ proto void memprof_dump_pprof(resource handle)
+   Dumps current memory usage in pprof heapprofile format to stream $handle */
+PHP_FUNCTION(memprof_dump_pprof)
+{
+    zval *arg1;
+    php_stream *stream;
+    HashTable symbols;
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &arg1) == FAILURE) {
+        return;
+    }
+
+    php_stream_from_zval(stream, &arg1);
+
+    WITHOUT_MALLOC_TRACKING {
+
+        zend_hash_init(&symbols, 8, NULL, NULL, 0);
+
+        /* symbols */
+
+        stream_printf(stream, "--- symbol\n");
+        stream_printf(stream, "binary=todo.php\n");
+        dump_frames_pprof_symbols(stream, &symbols, &default_frame);
+        stream_printf(stream, "---\n");
+        stream_printf(stream, "--- profile\n");
+
+        /* profile header */
+
+        /* header count */
+        stream_write_word(stream, 0);
+        /* header words after this one */
+        stream_write_word(stream, 3);
+        /* format version */
+        stream_write_word(stream, 0);
+        /* sampling period */
+        stream_write_word(stream, 0);
+        /* unused padding */
+        stream_write_word(stream, 0);
+
+        dump_frames_pprof(stream, &symbols, &default_frame);
 
     } END_WITHOUT_MALLOC_TRACKING;
 }

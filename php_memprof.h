@@ -46,6 +46,7 @@ PHP_RSHUTDOWN_FUNCTION(memprof);
 PHP_MINFO_FUNCTION(memprof);
 
 PHP_FUNCTION(memprof_dump_callgrind);
+PHP_FUNCTION(memprof_dump_pprof);
 PHP_FUNCTION(memprof_dump_array);
 PHP_FUNCTION(memprof_memory_get_usage);
 PHP_FUNCTION(memprof_memory_get_peak_usage);

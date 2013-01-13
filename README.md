@@ -97,6 +97,34 @@ Here is a KcacheGrind screenshot:
 
 ![KCacheGrind screenshot](http://img820.imageshack.us/img820/5530/screenshot3kve.png)
 
+### memprof_dump_pprof
+
+The memprof_dump_pprof function dumps the current memory usage to a stream in
+[pprof][4] format.
+
+``` php
+<?php
+memprof_dump_callgrind(fopen("profile.pprof", "w"));
+?>
+```
+
+The file can be visualized using [google-perftools][5]'s [``pprof``][4] tool.
+
+Display annotated call-graph in web browser or in ``gv``:
+
+```
+$ pprof --web profile.pprof
+$ pprof --gv profile.pprof
+```
+
+![pprof call-graph screenshot](http://img707.imageshack.us/img707/7697/screenshot3go.png)
+
+Output one line per function, sorted by own memory usage:
+
+```
+$ pprof --text profile.pprof
+```
+
 ### memprof_dump_array
 
 ``` php
@@ -195,4 +223,6 @@ Example output:
 [1]: https://www.gnu.org/software/libc/manual/html_node/Hooks-for-Malloc.html#Hooks-for-Malloc
 [2]: http://kcachegrind.sourceforge.net/html/Home.html
 [3]: http://judy.sourceforge.net/index.html
+[4]: https://google-perftools.googlecode.com/svn/trunk/doc/heapprofile.html
+[5]: https://google-perftools.googlecode.com/
 

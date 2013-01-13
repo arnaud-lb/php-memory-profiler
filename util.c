@@ -17,6 +17,11 @@ void stream_printf(php_stream * stream, const char * format, ...)
     efree(buf);
 }
 
+void stream_write_word(php_stream * stream, zend_uintptr_t word)
+{
+    php_stream_write(stream, (char*) &word, sizeof(word));
+}
+
 size_t get_function_name(zend_execute_data * execute_data, char * buf, size_t buf_size)
 {
     const char * function_name = NULL;
