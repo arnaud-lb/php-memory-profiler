@@ -90,7 +90,6 @@ with xdebug output files.
 ``` php
 <?php
 memprof_dump_callgrind(fopen("output", "w"));
-?>
 ```
 
 Here is a KcacheGrind screenshot:
@@ -104,8 +103,7 @@ The memprof_dump_pprof function dumps the current memory usage to a stream in
 
 ``` php
 <?php
-memprof_dump_callgrind(fopen("profile.pprof", "w"));
-?>
+memprof_dump_pprof(fopen("profile.heap", "w"));
 ```
 
 The file can be visualized using [google-perftools][5]'s [``pprof``][4] tool.
@@ -113,8 +111,9 @@ The file can be visualized using [google-perftools][5]'s [``pprof``][4] tool.
 Display annotated call-graph in web browser or in ``gv``:
 
 ```
-$ pprof --web profile.pprof
-$ pprof --gv profile.pprof
+$ pprof --web profile.heap
+$ # or:
+$ pprof --gv profile.heap
 ```
 
 ![pprof call-graph screenshot](http://img707.imageshack.us/img707/7697/screenshot3go.png)
@@ -122,7 +121,7 @@ $ pprof --gv profile.pprof
 Output one line per function, sorted by own memory usage:
 
 ```
-$ pprof --text profile.pprof
+$ pprof --text profile.heap
 ```
 
 ### memprof_dump_array
@@ -130,7 +129,6 @@ $ pprof --text profile.pprof
 ``` php
 <?php
 $dump = memprof_dump_array();
-?>
 ```
 
 The dump exposes the following informations:
