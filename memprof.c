@@ -956,7 +956,8 @@ static void dump_frames_pprof(php_stream * stream, HashTable * symbols, frame * 
             zend_uintptr_t * symaddr_p;
             if (zend_hash_find(symbols, prev->name, prev->name_len+1, (void**) &symaddr_p) != SUCCESS) {
                 /* shouldn't happen */
-                zend_error_noreturn(E_CORE_ERROR, "symbol address not found");
+                zend_error(E_CORE_ERROR, "symbol address not found");
+                return;
             }
             stream_write_word(stream, *symaddr_p);
         }
