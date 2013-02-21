@@ -83,9 +83,7 @@ Both tell which functions allocated all the currently allocated memory.
 
 The memprof_dump_callgrind function dumps the current memory usage to a stream
 in callgrind format. The file can then be read with tools such as
-[KCacheGrind][2]. Xdebug lists other tools capable of reading
-callgrind files: http://xdebug.org/docs/profiler, although they may only work
-with xdebug output files.
+[KCacheGrind][2] or [QCacheGrind][6].
 
 ``` php
 <?php
@@ -223,4 +221,5 @@ Example output:
 [3]: http://judy.sourceforge.net/index.html
 [4]: https://google-perftools.googlecode.com/svn/trunk/doc/heapprofile.html
 [5]: https://google-perftools.googlecode.com/
+[6]: https://www.google.com/search?q=qcachegrind
 
