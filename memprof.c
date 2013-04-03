@@ -82,6 +82,10 @@ static void * malloc_hook(size_t size, const void *caller);
 static void * realloc_hook(void *ptr, size_t size, const void *caller);
 static void free_hook(void *ptr, const void *caller);
 static void * memalign_hook(size_t alignment, size_t size, const void *caller);
+#if MEMPROF_DEBUG
+static int malloc_hook_line = 0;
+static const char * malloc_hook_file = NULL;
+#endif
 
 static void * (*old_malloc_hook) (size_t size, const void *caller) = NULL;
 static void * (*old_realloc_hook) (void *ptr, size_t size, const void *caller) = NULL;
@@ -309,6 +313,22 @@ int is_own_alloc(Pvoid_t * set, void * ptr)
 
 #if HAVE_MALLOC_HOOKS
 
+#if MEMPROF_DEBUG
+    #define MALLOC_HOOK_CHECK_NOT_OWN() \
+        if (__malloc_hook == malloc_hook) { \
+            fprintf(stderr, "MALLOC_HOOK_SAVE_OLD() used when __malloc_hook == malloc_hook (set at %s:%d)", malloc_hook_file, malloc_hook_line); \
+            abort(); \
+        } \
+
+    #define MALLOC_HOOK_SET_FILE_LINE() do { \
+        malloc_hook_file = __FILE__; \
+        malloc_hook_line = __LINE__; \
+    } while (0)
+#else
+    #define MALLOC_HOOK_CHECK_NOT_OWN()
+    #define MALLOC_HOOK_SET_FILE_LINE()
+#endif
+
 #define MALLOC_HOOK_RESTORE_OLD() \
     /* Restore all old hooks */ \
     __malloc_hook = old_malloc_hook; \
@@ -318,6 +338,7 @@ int is_own_alloc(Pvoid_t * set, void * ptr)
 
 #define MALLOC_HOOK_SAVE_OLD() \
     /* Save underlying hooks */ \
+    MALLOC_HOOK_CHECK_NOT_OWN(); \
     old_malloc_hook = __malloc_hook; \
     old_free_hook = __free_hook; \
     old_realloc_hook = __realloc_hook; \
@@ -329,6 +350,7 @@ int is_own_alloc(Pvoid_t * set, void * ptr)
     __free_hook = free_hook; \
     __realloc_hook = realloc_hook; \
     __memalign_hook = memalign_hook; \
+    MALLOC_HOOK_SET_FILE_LINE();
 
 #else /* HAVE_MALLOC_HOOKS */
 
