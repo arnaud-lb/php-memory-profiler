@@ -550,6 +550,9 @@ ZEND_DLEXPORT int memprof_zend_startup(zend_extension *extension)
 
     memprof_initialized = 1;
 
+    MALLOC_HOOK_SAVE_OLD();
+    MALLOC_HOOK_SET_OWN();
+
     if (is_zend_mm()) {
         zend_mm_heap * heap = zend_mm_startup();
         zend_mm_set_custom_handlers(heap, zend_malloc_handler, zend_free_handler, zend_realloc_handler);
@@ -558,9 +561,6 @@ ZEND_DLEXPORT int memprof_zend_startup(zend_extension *extension)
 
     init_frame(&default_frame, NULL, "root", sizeof("root")-1);
     default_frame.calls = 1;
-
-    MALLOC_HOOK_SAVE_OLD();
-    MALLOC_HOOK_SET_OWN();
 
     zend_hash_del(CG(function_table), "memory_get_usage", sizeof("memory_get_usage"));
     zend_hash_del(CG(function_table), "memory_get_peak_usage", sizeof("memory_get_peak_usage"));
