@@ -7,6 +7,13 @@ PHP_ARG_ENABLE(memprof, whether to enable memprof support,
 PHP_ARG_WITH(judy-dir, for judy lib,
  [  --with-judy-dir         Specify judy dir])
 
+AC_ARG_ENABLE(memprof-debug,
+[  --enable-memprof-debug   Enable memprof debugging],[
+  PHP_MEMPROF_DEBUG=$enableval
+],[
+  PHP_MEMPROF_DEBUG=no
+])
+
 if test "$PHP_MEMPROF" != "no"; then
 
   SEARCH_PATH="/usr/local /usr"
@@ -65,7 +72,14 @@ if test "$PHP_MEMPROF" != "no"; then
     AC_MSG_RESULT(no)
   ])
 
-  AC_DEFINE([MEMPROF_CONFIGURE_VERSION], 2, [Define configure version])
+  AC_DEFINE([MEMPROF_CONFIGURE_VERSION], 3, [Define configure version])
 
   PHP_NEW_EXTENSION(memprof, memprof.c util.c, $ext_shared)
 fi
+
+if test "$PHP_MEMPROF_DEBUG" != "no"; then
+  AC_DEFINE([MEMPROF_DEBUG], 1, [memprof debug])
+else
+  AC_DEFINE([MEMPROF_DEBUG], 0, [memprof debug])
+fi
+

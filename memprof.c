@@ -35,9 +35,7 @@
 #	error "ZTS build not supported"
 #endif
 
-#define MEMPROF_DEBUG 0
-
-#if MEMPROF_CONFIGURE_VERSION != 2
+#if MEMPROF_CONFIGURE_VERSION != 3
 #	error Please rebuild configure (run phpize and reconfigure)
 #endif
 
