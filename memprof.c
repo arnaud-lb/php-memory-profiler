@@ -94,7 +94,6 @@ static void * (*old_memalign_hook) (size_t alignment, size_t size, const void *c
 static void (*old_zend_execute)(zend_op_array *op_array TSRMLS_DC);
 static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, int return_value_used TSRMLS_DC);
 
-static int memprof_reserved_offset;
 static int memprof_initialized = 0;
 static int track_mallocs = 0;
 
@@ -588,12 +587,6 @@ ZEND_DLEXPORT int memprof_zend_startup(zend_extension *extension)
 
 	ret = zend_startup_module(&memprof_module_entry);
 
-	if (-1 == zend_get_resource_handle(extension)) {
-		fprintf(stderr, "zend_get_resource_handle failed");
-		abort();
-	}
-	memprof_reserved_offset = extension->resource_number;
-
 	return ret;
 }
 
@@ -619,12 +612,6 @@ ZEND_DLEXPORT void memprof_zend_shutdown(zend_extension *extension)
 	}
 }
 
-ZEND_DLEXPORT void memprof_init_oparray(zend_op_array *op_array)
-{   
-	TSRMLS_FETCH();
-	op_array->reserved[memprof_reserved_offset] = 0;
-}
-
 #ifndef ZEND_EXT_API
 #define ZEND_EXT_API    ZEND_DLEXPORT
 #endif
@@ -645,7 +632,7 @@ ZEND_DLEXPORT zend_extension zend_extension_entry = {
 	NULL,           /* statement_handler_func_t */
 	NULL,           /* fcall_begin_handler_func_t */
 	NULL,           /* fcall_end_handler_func_t */
-	memprof_init_oparray,   /* op_array_ctor_func_t */
+	NULL,           /* op_array_ctor_func_t */
 	NULL,           /* op_array_dtor_func_t */
 	STANDARD_ZEND_EXTENSION_PROPERTIES
 };
