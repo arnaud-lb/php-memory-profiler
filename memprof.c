@@ -1262,6 +1262,8 @@ PHP_FUNCTION(memprof_dump_pprof)
 
 		dump_frames_pprof(stream, &symbols, &default_frame);
 
+		zend_hash_destroy(&symbols);
+
 	} END_WITHOUT_MALLOC_TRACKING;
 }
 /* }}} */
