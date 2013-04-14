@@ -74,12 +74,38 @@ Or permanently, in php.ini:
 
 ## Usage
 
-The memory usage can be dumped by calling the memprof_dump_array() or
-memprof_dump_callgrind() functions.
+Memprof can be enabled during script execution by calling ``memprof_enable()``.
 
-Both tell which functions allocated all the currently allocated memory.
+Then the memory usage can be dumped by calling one of the ``memprof_dump_``
+functions. Both tell which functions allocated all the currently allocated
+memory.
 
-### memprof_dump_callgrind
+Example:
+
+```
+<?php
+
+memprof_enable();
+
+do_some_work();
+
+memprof_dump_callgrind(fopen("/tmp/callgrind.out", "w"));
+```
+
+### memprof_enabled()
+
+Returns whether memprof is enabled.
+
+### memprof_enable()
+
+Enables memprof and start tracking memory allocations. Note: any memory
+allocation made before this call is ignored.
+
+### memprof_disable()
+
+Disables memprof and forget previous allocations.
+
+### memprof_dump_callgrind(resource $stream)
 
 The memprof_dump_callgrind function dumps the current memory usage to a stream
 in callgrind format. The file can then be read with tools such as
@@ -94,7 +120,7 @@ Here is a KcacheGrind screenshot:
 
 ![KCacheGrind screenshot](http://img820.imageshack.us/img820/5530/screenshot3kve.png)
 
-### memprof_dump_pprof
+### memprof_dump_pprof(resource $stream)
 
 The memprof_dump_pprof function dumps the current memory usage to a stream in
 [pprof][4] format.
@@ -122,7 +148,7 @@ Output one line per function, sorted by own memory usage:
 $ pprof --text profile.heap
 ```
 
-### memprof_dump_array
+### memprof_dump_array()
 
 ``` php
 <?php
