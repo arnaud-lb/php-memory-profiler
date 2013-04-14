@@ -183,8 +183,15 @@ static void (*old_free_hook) (void *ptr, const void *caller) = NULL;
 static void * (*old_memalign_hook) (size_t alignment, size_t size, const void *caller) = NULL;
 #endif /* HAVE_MALLOC_HOOKS */
 
+#if PHP_VERSION_ID < 50500
 static void (*old_zend_execute)(zend_op_array *op_array TSRMLS_DC);
 static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, int return_value_used TSRMLS_DC);
+#define zend_execute_fn zend_execute
+#else
+static void (*old_zend_execute)(zend_execute_data *execute_data TSRMLS_DC);
+static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, zend_fcall_info *fci, int return_value_used TSRMLS_DC);
+#define zend_execute_fn zend_execute_ex
+#endif
 
 static int memprof_initialized = 0;
 static int memprof_enabled = 0;
@@ -635,7 +642,11 @@ static void * zend_realloc_handler(void * ptr, size_t size)
 	return result;
 }
 
+#if PHP_VERSION_ID < 50500
 static void memprof_zend_execute(zend_op_array *op_array TSRMLS_DC)
+#else
+static void memprof_zend_execute(zend_execute_data *execute_data TSRMLS_DC)
+#endif
 {
 	WITHOUT_MALLOC_TRACKING {
 
@@ -645,7 +656,11 @@ static void memprof_zend_execute(zend_op_array *op_array TSRMLS_DC)
 
 	} END_WITHOUT_MALLOC_TRACKING;
 
+#if PHP_VERSION_ID < 50500
 	old_zend_execute(op_array TSRMLS_CC);
+#else
+	old_zend_execute(execute_data TSRMLS_CC);
+#endif
 
 	if (memprof_enabled) {
 		current_frame = current_frame->prev;
@@ -653,7 +668,11 @@ static void memprof_zend_execute(zend_op_array *op_array TSRMLS_DC)
 	}
 }
 
+#if PHP_VERSION_ID < 50500
 static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, int return_value_used TSRMLS_DC)
+#else
+static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, zend_fcall_info *fci, int return_value_used TSRMLS_DC)
+#endif
 {
 	int ignore = 0;
 
@@ -676,11 +695,19 @@ static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, i
 
 	} END_WITHOUT_MALLOC_TRACKING;
 
+#if PHP_VERSION_ID < 50500
 	if (!old_zend_execute_internal) {
 		execute_internal(execute_data_ptr, return_value_used);
 	} else {
 		old_zend_execute_internal(execute_data_ptr, return_value_used);
 	}
+#else
+	if (!old_zend_execute_internal) {
+		execute_internal(execute_data_ptr, fci, return_value_used);
+	} else {
+		old_zend_execute_internal(execute_data_ptr, fci, return_value_used);
+	}
+#endif
 
 	if (!ignore && memprof_enabled) {
 		current_frame = current_frame->prev;
@@ -713,9 +740,9 @@ static void memprof_enable()
 		orig_zheap = NULL;
 	}
 
-	old_zend_execute = zend_execute;
+	old_zend_execute = zend_execute_fn;
 	old_zend_execute_internal = zend_execute_internal;
-	zend_execute = memprof_zend_execute;
+	zend_execute_fn = memprof_zend_execute;
 	zend_execute_internal = memprof_zend_execute_internal;
 
 	track_mallocs = 1;
@@ -725,7 +752,7 @@ static void memprof_disable()
 {
 	track_mallocs = 0;
 
-	zend_execute = old_zend_execute;
+	zend_execute_fn = old_zend_execute;
 	zend_execute_internal = old_zend_execute_internal;
 
 	if (zheap) {
@@ -883,9 +910,6 @@ PHP_MSHUTDOWN_FUNCTION(memprof)
 	/* uncomment this line if you have INI entries
 	UNREGISTER_INI_ENTRIES();
 	*/
-
-	zend_execute_internal = old_zend_execute_internal;
-	zend_execute = old_zend_execute;
 
 	return SUCCESS;
 }
