@@ -208,10 +208,6 @@ static zend_mm_heap * orig_zheap = NULL;
 #define ALLOC_LIST_INSERT_HEAD(head, elem) alloc_list_insert_head(head, elem)
 #define ALLOC_LIST_REMOVE(elem) alloc_list_remove(elem)
 
-static inline size_t alloc_size(size_t size) {
-	return ZEND_MM_ALIGNED_SIZE(size) + sizeof(struct _alloc);
-}
-
 static inline void alloc_init(alloc * alloc, size_t size) {
 	alloc->size = size;
 	alloc->list.le_next = NULL;
