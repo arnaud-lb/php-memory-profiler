@@ -36,7 +36,8 @@
 #include <assert.h>
 
 #ifdef ZTS
-#	error "ZTS build not supported"
+	/* TODO: support ZTS builds (without malloc hooks) */
+#	error "ZTS build not supported (yet)"
 #endif
 
 #if MEMPROF_CONFIGURE_VERSION != 3
