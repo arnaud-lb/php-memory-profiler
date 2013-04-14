@@ -213,8 +213,6 @@ Example output:
 
  * Support for tracking persistent (non-zend-alloc) allocations when libc
    doesn't have malloc hooks
- * Make it work without disabling the Zend memory allocator; or implement
-   memory_limit
 
 [1]: https://www.gnu.org/software/libc/manual/html_node/Hooks-for-Malloc.html#Hooks-for-Malloc
 [2]: http://kcachegrind.sourceforge.net/html/Home.html

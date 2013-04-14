@@ -189,11 +189,6 @@ static int memprof_initialized = 0;
 static int memprof_enabled = 0;
 static int track_mallocs = 0;
 
-static size_t memory_usage = 0;
-static size_t memory_usage_real = 0;
-static size_t memory_usage_peak = 0;
-static size_t memory_usage_peak_real = 0;
-
 static frame default_frame;
 static frame * current_frame = &default_frame;
 static alloc_list_head * current_alloc_list = &default_frame.allocs;
@@ -206,9 +201,6 @@ static zend_mm_heap * zheap = NULL;
 static zend_mm_heap * orig_zheap = NULL;
 
 /* ZEND_DECLARE_MODULE_GLOBALS(memprof) */
-
-/* estimated actual size of an allocation (requested size + overhead) */
-#define ALLOC_SIZE(size) alloc_size(size)
 
 #define ALLOC_INIT(alloc, size) alloc_init(alloc, size)
 
@@ -413,24 +405,6 @@ static int frame_stack_depth(const frame * f)
 	return depth;
 }
 
-static void incr_memory_usage(size_t size, size_t real_size)
-{
-	memory_usage += size;
-	memory_usage_real += real_size;
-	if (memory_usage_peak < memory_usage) {
-		memory_usage_peak = memory_usage;
-	}
-	if (memory_usage_peak_real < memory_usage_real) {
-		memory_usage_peak_real = memory_usage_real;
-	}
-}
-
-static void decr_memory_usage(size_t size, size_t real_size)
-{
-	memory_usage -= size;
-	memory_usage_real -= real_size;
-}
-
 static void mark_own_alloc(Pvoid_t * set, void * ptr, alloc * a)
 {
 	Word_t * p;
@@ -477,7 +451,6 @@ static void * malloc_hook(size_t size, const void *caller)
 			}
 			mark_own_alloc(&allocs_set, result, a);
 			assert(is_own_alloc(&allocs_set, result));
-			incr_memory_usage(size, ALLOC_SIZE(size));
 		}
 
 	} END_WITHOUT_MALLOC_HOOKS;
@@ -489,7 +462,6 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
 {
 	void *result;
 	alloc *a;
-	size_t oldsize;
 
 	WITHOUT_MALLOC_HOOKS {
 
@@ -499,9 +471,7 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
 			/* ptr may be freed by realloc, so we must remove it from list now */
 			if (ptr != NULL) {
 				ALLOC_CHECK(a);
-				oldsize = a->size;
 				ALLOC_LIST_REMOVE(a);
-				decr_memory_usage(oldsize, ALLOC_SIZE(oldsize));
 				unmark_own_alloc(&allocs_set, ptr);
 				alloc_buckets_free(&current_alloc_buckets, a);
 			}
@@ -514,7 +484,6 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
 					ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
 				}
 				mark_own_alloc(&allocs_set, result, a);
-				incr_memory_usage(size, ALLOC_SIZE(size));
 			} else if (ptr != NULL) {
 				/* failed, re-add ptr, since it hasn't been freed */
 				a = alloc_buckets_alloc(&current_alloc_buckets, size);
@@ -522,7 +491,6 @@ static void * realloc_hook(void *ptr, size_t size, const void *caller)
 					ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
 				}
 				mark_own_alloc(&allocs_set, ptr, a);
-				incr_memory_usage(oldsize, ALLOC_SIZE(oldsize));
 			}
 		}
 
@@ -538,11 +506,9 @@ static void free_hook(void *ptr, const void *caller)
 		if (ptr != NULL) {
 			alloc * a;
 			if ((a = is_own_alloc(&allocs_set, ptr))) {
-				size_t size = a->size;
 				ALLOC_CHECK(a);
 				ALLOC_LIST_REMOVE(a);
 				free(ptr);
-				decr_memory_usage(size, ALLOC_SIZE(size));
 				unmark_own_alloc(&allocs_set, ptr);
 				alloc_buckets_free(&current_alloc_buckets, a);
 			} else {
@@ -566,7 +532,6 @@ static void * memalign_hook(size_t alignment, size_t size, const void *caller)
 				ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
 			}
 			mark_own_alloc(&allocs_set, result, a);
-			incr_memory_usage(size, size + ALLOC_SIZE(size));
 		}	
 
 	} END_WITHOUT_MALLOC_HOOKS;
@@ -601,7 +566,6 @@ static void * zend_malloc_handler(size_t size)
 			}
 			mark_own_alloc(&allocs_set, result, a);
 			assert(is_own_alloc(&allocs_set, result));
-			incr_memory_usage(size, ALLOC_SIZE(size));
 		}
 
 	} END_WITHOUT_MALLOC_HOOKS;
@@ -618,11 +582,9 @@ static void zend_free_handler(void * ptr)
 		if (ptr != NULL) {
 			alloc * a;
 			if ((a = is_own_alloc(&allocs_set, ptr))) {
-				size_t size = a->size;
 				ALLOC_CHECK(a);
 				ALLOC_LIST_REMOVE(a);
 				zend_mm_free(orig_zheap, ptr);
-				decr_memory_usage(size, ALLOC_SIZE(size));
 				unmark_own_alloc(&allocs_set, ptr);
 				alloc_buckets_free(&current_alloc_buckets, a);
 			} else {
@@ -637,7 +599,6 @@ static void * zend_realloc_handler(void * ptr, size_t size)
 {
 	void *result;
 	alloc *a;
-	size_t oldsize;
 
 	assert(memprof_enabled);
 
@@ -649,9 +610,7 @@ static void * zend_realloc_handler(void * ptr, size_t size)
 			/* ptr may be freed by realloc, so we must remove it from list now */
 			if (ptr != NULL) {
 				ALLOC_CHECK(a);
-				oldsize = a->size;
 				ALLOC_LIST_REMOVE(a);
-				decr_memory_usage(oldsize, ALLOC_SIZE(oldsize));
 				unmark_own_alloc(&allocs_set, ptr);
 				alloc_buckets_free(&current_alloc_buckets, a);
 			}
@@ -664,7 +623,6 @@ static void * zend_realloc_handler(void * ptr, size_t size)
 					ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
 				}
 				mark_own_alloc(&allocs_set, result, a);
-				incr_memory_usage(size, ALLOC_SIZE(size));
 			} else if (ptr != NULL) {
 				/* failed, re-add ptr, since it hasn't been freed */
 				a = alloc_buckets_alloc(&current_alloc_buckets, size);
@@ -672,7 +630,6 @@ static void * zend_realloc_handler(void * ptr, size_t size)
 					ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
 				}
 				mark_own_alloc(&allocs_set, ptr, a);
-				incr_memory_usage(oldsize, ALLOC_SIZE(oldsize));
 			}
 		}
 
@@ -1296,7 +1253,13 @@ PHP_FUNCTION(memprof_memory_get_usage)
 		return;
 	}
 
-	RETURN_LONG(real ? memory_usage_real : memory_usage);
+	if (memprof_enabled && orig_zheap) {
+		zend_mm_set_heap(orig_zheap);
+		RETVAL_LONG(zend_memory_usage(real));
+		zend_mm_set_heap(zheap);
+	} else {
+		RETVAL_LONG(zend_memory_usage(real));
+	}
 }
 /* }}} */
 
@@ -1310,7 +1273,13 @@ PHP_FUNCTION(memprof_memory_get_peak_usage)
 		return;
 	}
 
-	RETURN_LONG(real ? memory_usage_peak_real : memory_usage_peak);
+	if (memprof_enabled && orig_zheap) {
+		zend_mm_set_heap(orig_zheap);
+		RETVAL_LONG(zend_memory_peak_usage(real));
+		zend_mm_set_heap(zheap);
+	} else {
+		RETVAL_LONG(zend_memory_peak_usage(real));
+	}
 }
 /* }}} */
 
