@@ -30,6 +30,10 @@
 #include <sys/queue.h>
 #include "util.h"
 #include <Judy.h>
+#if MEMPROF_DEBUG
+#	undef NDEBUG
+#endif
+#include <assert.h>
 
 #ifdef ZTS
 #	error "ZTS build not supported"
@@ -41,15 +45,89 @@
 
 #if HAVE_MALLOC_HOOKS
 #	include <malloc.h>
-#else
-#	warning No support for malloc hooks, this build will not track persistent allocations
-#endif
 
-#ifdef __GNUC__
-#	define memprof_used __attribute__((used))
-#else
-#	define memprof_used
-#endif
+#	if MEMPROF_DEBUG
+#		define MALLOC_HOOK_CHECK_NOT_OWN() \
+			if (__malloc_hook == malloc_hook) { \
+				fprintf(stderr, "__malloc_hook == malloc_hook (set at %s:%d)", malloc_hook_file, malloc_hook_line); \
+				abort(); \
+			} \
+
+#		define MALLOC_HOOK_CHECK_OWN() \
+			if (__malloc_hook != malloc_hook) { \
+				fprintf(stderr, "__malloc_hook != malloc_hook"); \
+				abort(); \
+			} \
+
+#		define MALLOC_HOOK_SET_FILE_LINE() do { \
+			malloc_hook_file = __FILE__; \
+			malloc_hook_line = __LINE__; \
+		} while (0)
+
+#	else /* MEMPROF_DEBUG */
+#		define MALLOC_HOOK_CHECK_NOT_OWN()
+#		define MALLOC_HOOK_CHECK_OWN()
+#		define MALLOC_HOOK_SET_FILE_LINE()
+#	endif /* MEMPROF_DEBUG */
+
+#	define WITHOUT_MALLOC_HOOKS \
+		do { \
+			int ___malloc_hook_restored = 0; \
+			if (__malloc_hook == malloc_hook) { \
+				MALLOC_HOOK_RESTORE_OLD(); \
+				___malloc_hook_restored = 1; \
+			} \
+			do \
+
+#	define END_WITHOUT_MALLOC_HOOKS \
+			while (0); \
+			if (___malloc_hook_restored) { \
+				MALLOC_HOOK_SAVE_OLD(); \
+				MALLOC_HOOK_SET_OWN(); \
+			} \
+		} while (0)
+
+#	define MALLOC_HOOK_RESTORE_OLD() \
+		/* Restore all old hooks */ \
+		MALLOC_HOOK_CHECK_OWN(); \
+		__malloc_hook = old_malloc_hook; \
+		__free_hook = old_free_hook; \
+		__realloc_hook = old_realloc_hook; \
+		__memalign_hook = old_memalign_hook; \
+
+#	define MALLOC_HOOK_SAVE_OLD() \
+		/* Save underlying hooks */ \
+		MALLOC_HOOK_CHECK_NOT_OWN(); \
+		old_malloc_hook = __malloc_hook; \
+		old_free_hook = __free_hook; \
+		old_realloc_hook = __realloc_hook; \
+		old_memalign_hook = __memalign_hook; \
+
+#	define MALLOC_HOOK_SET_OWN() \
+		/* Restore our own hooks */ \
+		__malloc_hook = malloc_hook; \
+		__free_hook = free_hook; \
+		__realloc_hook = realloc_hook; \
+		__memalign_hook = memalign_hook; \
+		MALLOC_HOOK_SET_FILE_LINE();
+
+#else /* HAVE_MALLOC_HOOKS */
+
+#	warning No support for malloc hooks, this build will not track persistent allocations
+
+#	define MALLOC_HOOK_CHECK_NOT_OWN()
+#	define MALLOC_HOOK_IS_SET() (__malloc_hook == malloc_hook)
+#	define MALLOC_HOOK_RESTORE_OLD()
+#	define MALLOC_HOOK_SAVE_OLD()
+#	define MALLOC_HOOK_SET_OWN()
+#	define WITHOUT_MALLOC_HOOKS \
+		do { \
+			do
+#	define END_WITHOUT_MALLOC_HOOKS \
+			while (0); \
+		} while (0);
+
+#endif /* HAVE_MALLOC_HOOKS */
 
 typedef LIST_HEAD(_alloc_list_head, _alloc) alloc_list_head;
 
@@ -63,7 +141,7 @@ typedef struct _frame {
 	alloc_list_head allocs;
 } frame;
 
-/* an allocated block header */
+/* an allocated block's infos */
 typedef struct _alloc {
 #if MEMPROF_DEBUG
 	size_t canary_a;
@@ -74,6 +152,18 @@ typedef struct _alloc {
 	size_t canary_b;
 #endif
 } alloc;
+
+typedef union _alloc_bucket_item {
+	alloc alloc;
+	union _alloc_bucket_item * next_free;
+} alloc_bucket_item;
+
+typedef struct _alloc_buckets {
+	size_t growsize;
+	size_t nbuckets;
+	alloc_bucket_item * next_free;
+	alloc_bucket_item ** buckets;
+} alloc_buckets;
 
 #if HAVE_MALLOC_HOOKS
 static void * malloc_hook(size_t size, const void *caller);
@@ -95,6 +185,7 @@ static void (*old_zend_execute)(zend_op_array *op_array TSRMLS_DC);
 static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, int return_value_used TSRMLS_DC);
 
 static int memprof_initialized = 0;
+static int memprof_enabled = 0;
 static int track_mallocs = 0;
 
 static size_t memory_usage = 0;
@@ -105,38 +196,26 @@ static size_t memory_usage_peak_real = 0;
 static frame default_frame;
 static frame * current_frame = &default_frame;
 static alloc_list_head * current_alloc_list = &default_frame.allocs;
+static alloc_buckets current_alloc_buckets;
 
 static Pvoid_t allocs_set = (Pvoid_t) NULL;
 
-static zend_mm_heap * orig_heap = NULL;
+static const size_t zend_mm_heap_size = 4096;
+static zend_mm_heap * zheap = NULL;
+static zend_mm_heap * orig_zheap = NULL;
 
 /* ZEND_DECLARE_MODULE_GLOBALS(memprof) */
 
-/* returns the actual data of an allocated block */
-#define ALLOC_DATA(alloc) alloc_data(alloc)
-
-/* returns the block header, given a pointer to the begining of its data */
-#define ALLOC_BLOCK(data) alloc_block(data)
-
-/* size of a block header */
-#define ALLOC_HEAD_SIZE \
-	(ZEND_MM_ALIGNED_SIZE(sizeof(struct _alloc)))
-
-/* actual size of a allocation, given the requested size (i.e. data size + header size and alignments) */
-#define ALLOC_SIZE(size) \
-	(size > SIZE_MAX - ALLOC_HEAD_SIZE ? 0 : ALLOC_HEAD_SIZE + size)
+/* estimated actual size of an allocation (requested size + overhead) */
+#define ALLOC_SIZE(size) alloc_size(size)
 
 #define ALLOC_INIT(alloc, size) alloc_init(alloc, size)
 
 #define ALLOC_LIST_INSERT_HEAD(head, elem) alloc_list_insert_head(head, elem)
-#define ALLOC_LIST_REMOVE(elem) alloc_list_remove(elem, __FUNCTION__, __LINE__)
+#define ALLOC_LIST_REMOVE(elem) alloc_list_remove(elem)
 
-static inline void * alloc_data(alloc * a) {
-	return (void*)(((uintptr_t)a)+ALLOC_HEAD_SIZE);
-}
-
-static inline alloc * alloc_block(void * a) {
-	return (alloc*) &((char*)a)[-ALLOC_HEAD_SIZE];
+static inline size_t alloc_size(size_t size) {
+	return ZEND_MM_ALIGNED_SIZE(size) + sizeof(struct _alloc);
 }
 
 static inline void alloc_init(alloc * alloc, size_t size) {
@@ -156,7 +235,7 @@ static void list_remove(alloc * elm) {
 	LIST_REMOVE(elm, list);
 }
 
-static void alloc_list_remove(alloc * elem, const char * function, int line) {
+static void alloc_list_remove(alloc * elem) {
 	if (elem->list.le_prev || elem->list.le_next) {
 		list_remove(elem);
 		elem->list.le_next = NULL;
@@ -185,6 +264,68 @@ static void alloc_check(alloc * alloc, const char * function, int line) {
 #else /* MEMPROF_DEBUG */
 #	define ALLOC_CHECK(alloc)
 #endif /* MEMPROF_DEBUG */
+
+static void alloc_buckets_destroy(alloc_buckets * buckets)
+{
+	size_t i;
+
+	for (i = 0; i < buckets->nbuckets; ++i) {
+		free(buckets->buckets[i]);
+	}
+	free(buckets->buckets);
+}
+
+static void alloc_buckets_grow(alloc_buckets * buckets)
+{
+	size_t i;
+	alloc_bucket_item * bucket;
+
+	buckets->nbuckets++;
+	buckets->buckets = realloc(buckets->buckets, sizeof(*buckets->buckets)*buckets->nbuckets);
+
+	buckets->growsize <<= 1;
+	bucket = malloc(sizeof(*bucket)*buckets->growsize);
+	buckets->buckets[buckets->nbuckets-1] = bucket;
+
+	for (i = 1; i < buckets->growsize; ++i) {
+		bucket[i-1].next_free = &bucket[i];
+	}
+	bucket[buckets->growsize-1].next_free = buckets->next_free;
+	buckets->next_free = &bucket[0];
+}
+
+static void alloc_buckets_init(alloc_buckets * buckets)
+{
+	buckets->growsize = 128;
+	buckets->nbuckets = 0;
+	buckets->buckets = NULL;
+	buckets->next_free = NULL;
+	alloc_buckets_grow(buckets);
+}
+
+static alloc * alloc_buckets_alloc(alloc_buckets * buckets, size_t size)
+{
+	alloc_bucket_item * item = buckets->next_free;
+
+	if (item == NULL) {
+		alloc_buckets_grow(buckets);
+		item = buckets->next_free;
+	}
+
+	buckets->next_free = item->next_free;
+
+	ALLOC_INIT(&item->alloc, size);
+
+	return &item->alloc;
+}
+
+static void alloc_buckets_free(alloc_buckets * buckets, alloc * a)
+{
+	alloc_bucket_item * item;
+	item = (alloc_bucket_item*) a;
+	item->next_free = buckets->next_free;
+	buckets->next_free = item;
+}
 
 static void destroy_frame(frame * f)
 {
@@ -289,73 +430,148 @@ static void decr_memory_usage(size_t size, size_t real_size)
 	memory_usage_real -= real_size;
 }
 
-static void mark_own_alloc(Pvoid_t * set, void * ptr)
+static void mark_own_alloc(Pvoid_t * set, void * ptr, alloc * a)
 {
-	int ret;
-	J1S(ret, *set, (Word_t)ptr);
+	Word_t * p;
+	JLI(p, *set, (Word_t)ptr);
+	*p = (Word_t) a;
 }
 
 static void unmark_own_alloc(Pvoid_t * set, void * ptr)
 {
 	int ret;
-	J1U(ret, *set, (Word_t)ptr);
+
+	MALLOC_HOOK_CHECK_NOT_OWN();
+
+	JLD(ret, *set, (Word_t)ptr);
 }
 
-int is_own_alloc(Pvoid_t * set, void * ptr)
+alloc * is_own_alloc(Pvoid_t * set, void * ptr)
 {
-	int ret;
-	J1T(ret, *set, (Word_t)ptr);
-	return ret;
+	Word_t * p;
+
+	MALLOC_HOOK_CHECK_NOT_OWN();
+
+	JLG(p, *set, (Word_t)ptr);
+	if (p != NULL) {
+		return (alloc*) *p;
+	} else {
+		return 0;
+	}
 }
 
 #if HAVE_MALLOC_HOOKS
 
-#	if MEMPROF_DEBUG
-#		define MALLOC_HOOK_CHECK_NOT_OWN() \
-			if (__malloc_hook == malloc_hook) { \
-				fprintf(stderr, "MALLOC_HOOK_SAVE_OLD() used when __malloc_hook == malloc_hook (set at %s:%d)", malloc_hook_file, malloc_hook_line); \
-				abort(); \
-			} \
+static void * malloc_hook(size_t size, const void *caller)
+{
+	void *result;
 
-#		define MALLOC_HOOK_SET_FILE_LINE() do { \
-			malloc_hook_file = __FILE__; \
-			malloc_hook_line = __LINE__; \
-		} while (0)
+	WITHOUT_MALLOC_HOOKS {
 
-#	else /* MEMPROF_DEBUG */
-#		define MALLOC_HOOK_CHECK_NOT_OWN()
-#		define MALLOC_HOOK_SET_FILE_LINE()
-#	endif /* MEMPROF_DEBUG */
+		result = malloc(size);
+		if (result != NULL) {
+			alloc * a = alloc_buckets_alloc(&current_alloc_buckets, size);
+			if (track_mallocs) {
+				ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
+			}
+			mark_own_alloc(&allocs_set, result, a);
+			assert(is_own_alloc(&allocs_set, result));
+			incr_memory_usage(size, ALLOC_SIZE(size));
+		}
 
-#	define MALLOC_HOOK_RESTORE_OLD() \
-		/* Restore all old hooks */ \
-		__malloc_hook = old_malloc_hook; \
-		__free_hook = old_free_hook; \
-		__realloc_hook = old_realloc_hook; \
-		__memalign_hook = old_memalign_hook; \
+	} END_WITHOUT_MALLOC_HOOKS;
 
-#	define MALLOC_HOOK_SAVE_OLD() \
-		/* Save underlying hooks */ \
-		MALLOC_HOOK_CHECK_NOT_OWN(); \
-		old_malloc_hook = __malloc_hook; \
-		old_free_hook = __free_hook; \
-		old_realloc_hook = __realloc_hook; \
-		old_memalign_hook = __memalign_hook; \
+	return result;
+}
 
-#	define MALLOC_HOOK_SET_OWN() \
-		/* Restore our own hooks */ \
-		__malloc_hook = malloc_hook; \
-		__free_hook = free_hook; \
-		__realloc_hook = realloc_hook; \
-		__memalign_hook = memalign_hook; \
-		MALLOC_HOOK_SET_FILE_LINE();
+static void * realloc_hook(void *ptr, size_t size, const void *caller)
+{
+	void *result;
+	alloc *a;
+	size_t oldsize;
 
-#else /* HAVE_MALLOC_HOOKS */
+	WITHOUT_MALLOC_HOOKS {
 
-#	define MALLOC_HOOK_RESTORE_OLD()
-#	define MALLOC_HOOK_SAVE_OLD()
-#	define MALLOC_HOOK_SET_OWN()
+		if (ptr != NULL && !(a = is_own_alloc(&allocs_set, ptr))) {
+			result = realloc(ptr, size);
+		} else {
+			/* ptr may be freed by realloc, so we must remove it from list now */
+			if (ptr != NULL) {
+				ALLOC_CHECK(a);
+				oldsize = a->size;
+				ALLOC_LIST_REMOVE(a);
+				decr_memory_usage(oldsize, ALLOC_SIZE(oldsize));
+				unmark_own_alloc(&allocs_set, ptr);
+				alloc_buckets_free(&current_alloc_buckets, a);
+			}
 
+			result = realloc(ptr, size);
+			if (result != NULL) {
+				/* succeeded; add result */
+				a = alloc_buckets_alloc(&current_alloc_buckets, size);
+				if (track_mallocs) {
+					ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
+				}
+				mark_own_alloc(&allocs_set, result, a);
+				incr_memory_usage(size, ALLOC_SIZE(size));
+			} else if (ptr != NULL) {
+				/* failed, re-add ptr, since it hasn't been freed */
+				a = alloc_buckets_alloc(&current_alloc_buckets, size);
+				if (track_mallocs) {
+					ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
+				}
+				mark_own_alloc(&allocs_set, ptr, a);
+				incr_memory_usage(oldsize, ALLOC_SIZE(oldsize));
+			}
+		}
+
+	} END_WITHOUT_MALLOC_HOOKS;
+
+	return result;
+}
+
+static void free_hook(void *ptr, const void *caller)
+{
+	WITHOUT_MALLOC_HOOKS {
+
+		if (ptr != NULL) {
+			alloc * a;
+			if ((a = is_own_alloc(&allocs_set, ptr))) {
+				size_t size = a->size;
+				ALLOC_CHECK(a);
+				ALLOC_LIST_REMOVE(a);
+				free(ptr);
+				decr_memory_usage(size, ALLOC_SIZE(size));
+				unmark_own_alloc(&allocs_set, ptr);
+				alloc_buckets_free(&current_alloc_buckets, a);
+			} else {
+				free(ptr);
+			}
+		}
+
+	} END_WITHOUT_MALLOC_HOOKS;
+}
+
+static void * memalign_hook(size_t alignment, size_t size, const void *caller)
+{
+	void * result;
+
+	WITHOUT_MALLOC_HOOKS {
+
+		result = memalign(alignment, size);
+		if (result != NULL) {
+			alloc *a = alloc_buckets_alloc(&current_alloc_buckets, size);
+			if (track_mallocs) {
+				ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
+			}
+			mark_own_alloc(&allocs_set, result, a);
+			incr_memory_usage(size, size + ALLOC_SIZE(size));
+		}	
+
+	} END_WITHOUT_MALLOC_HOOKS;
+
+	return result;
+}
 #endif /* HAVE_MALLOC_HOOKS */
 
 #define WITHOUT_MALLOC_TRACKING do { \
@@ -368,149 +584,100 @@ int is_own_alloc(Pvoid_t * set, void * ptr)
 	track_mallocs = ___old_track_mallocs; \
 } while (0)
 
-static void * malloc_hook(size_t size, const void *caller)
+static void * zend_malloc_handler(size_t size)
 {
 	void *result;
-	size_t block_size;
 
-	MALLOC_HOOK_RESTORE_OLD();
+	assert(memprof_enabled);
 
-	if (0 == (block_size = ALLOC_SIZE(size))) {
-		result = NULL;
-	} else {
-		result = malloc(block_size);
+	WITHOUT_MALLOC_HOOKS {
+
+		result = zend_mm_alloc(orig_zheap, size);
 		if (result != NULL) {
-			incr_memory_usage(size, block_size);
-			ALLOC_INIT((alloc*)result, size);
+			alloc * a = alloc_buckets_alloc(&current_alloc_buckets, size);
 			if (track_mallocs) {
-				ALLOC_LIST_INSERT_HEAD(current_alloc_list, (alloc*)result);
+				ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
 			}
-			ALLOC_CHECK((alloc*)result);
-			result = ALLOC_DATA(result);
-			mark_own_alloc(&allocs_set, result);
+			mark_own_alloc(&allocs_set, result, a);
+			assert(is_own_alloc(&allocs_set, result));
+			incr_memory_usage(size, ALLOC_SIZE(size));
 		}
-	}
 
-	MALLOC_HOOK_SAVE_OLD();
-	MALLOC_HOOK_SET_OWN();
+	} END_WITHOUT_MALLOC_HOOKS;
 
 	return result;
 }
 
-static void * realloc_hook(void *ptr, size_t size, const void *caller)
+static void zend_free_handler(void * ptr)
 {
-	void *result;
-	size_t block_size;
+	assert(memprof_enabled);
 
-	MALLOC_HOOK_RESTORE_OLD();
+	WITHOUT_MALLOC_HOOKS {
 
-	if (ptr != NULL && !is_own_alloc(&allocs_set, ptr)) {
-		result = realloc(ptr, size);
-	} else if (0 == (block_size = ALLOC_SIZE(size))) {
-		result = NULL;
-	} else {
-		/* ptr may be freed by realloc, so we must remove it from list now */
 		if (ptr != NULL) {
-			ALLOC_CHECK(ALLOC_BLOCK(ptr));
-			ALLOC_LIST_REMOVE(ALLOC_BLOCK(ptr));
-			decr_memory_usage(ALLOC_BLOCK(ptr)->size, ALLOC_SIZE(ALLOC_BLOCK(ptr)->size));
-			unmark_own_alloc(&allocs_set, ptr);
+			alloc * a;
+			if ((a = is_own_alloc(&allocs_set, ptr))) {
+				size_t size = a->size;
+				ALLOC_CHECK(a);
+				ALLOC_LIST_REMOVE(a);
+				zend_mm_free(orig_zheap, ptr);
+				decr_memory_usage(size, ALLOC_SIZE(size));
+				unmark_own_alloc(&allocs_set, ptr);
+				alloc_buckets_free(&current_alloc_buckets, a);
+			} else {
+				zend_mm_free(orig_zheap, ptr);
+			}
 		}
 
-		result = realloc(ptr ? ALLOC_BLOCK(ptr) : NULL, block_size);
-		if (result != NULL) {
-			/* succeeded; add result */
-			ALLOC_INIT((alloc*)result, size);
-			if (track_mallocs) {
-				ALLOC_LIST_INSERT_HEAD(current_alloc_list, (alloc*)result);
-			}
-			incr_memory_usage(size, block_size);
-			ALLOC_CHECK((alloc*)result);
-			result = ALLOC_DATA(result);
-			mark_own_alloc(&allocs_set, result);
-		} else if (ptr != NULL) {
-			/* failed, re-add ptr, since it hasn't been freed */
-			incr_memory_usage(size, ALLOC_SIZE(ALLOC_BLOCK(ptr)->size));
-			ALLOC_CHECK(ptr);
-			if (track_mallocs) {
-				ALLOC_LIST_INSERT_HEAD(current_alloc_list, ALLOC_BLOCK(ptr));
-			}
-			ALLOC_CHECK(ALLOC_BLOCK(ptr));
-			mark_own_alloc(&allocs_set, ptr);
-		}
-	}
+	} END_WITHOUT_MALLOC_HOOKS;
+}
 
-	MALLOC_HOOK_SAVE_OLD();
-	MALLOC_HOOK_SET_OWN();
+static void * zend_realloc_handler(void * ptr, size_t size)
+{
+	void *result;
+	alloc *a;
+	size_t oldsize;
+
+	assert(memprof_enabled);
+
+	WITHOUT_MALLOC_HOOKS {
+
+		if (ptr != NULL && !(a = is_own_alloc(&allocs_set, ptr))) {
+			result = zend_mm_realloc(orig_zheap, ptr, size);
+		} else {
+			/* ptr may be freed by realloc, so we must remove it from list now */
+			if (ptr != NULL) {
+				ALLOC_CHECK(a);
+				oldsize = a->size;
+				ALLOC_LIST_REMOVE(a);
+				decr_memory_usage(oldsize, ALLOC_SIZE(oldsize));
+				unmark_own_alloc(&allocs_set, ptr);
+				alloc_buckets_free(&current_alloc_buckets, a);
+			}
+
+			result = zend_mm_realloc(orig_zheap, ptr, size);
+			if (result != NULL) {
+				/* succeeded; add result */
+				a = alloc_buckets_alloc(&current_alloc_buckets, size);
+				if (track_mallocs) {
+					ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
+				}
+				mark_own_alloc(&allocs_set, result, a);
+				incr_memory_usage(size, ALLOC_SIZE(size));
+			} else if (ptr != NULL) {
+				/* failed, re-add ptr, since it hasn't been freed */
+				a = alloc_buckets_alloc(&current_alloc_buckets, size);
+				if (track_mallocs) {
+					ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
+				}
+				mark_own_alloc(&allocs_set, ptr, a);
+				incr_memory_usage(oldsize, ALLOC_SIZE(oldsize));
+			}
+		}
+
+	} END_WITHOUT_MALLOC_HOOKS;
 
 	return result;
-}
-
-static void free_hook(void *ptr, const void *caller)
-{
-	MALLOC_HOOK_RESTORE_OLD();
-
-	if (ptr != NULL) {
-		if (!is_own_alloc(&allocs_set, ptr)) {
-			free(ptr);
-		} else {
-			size_t size = ALLOC_BLOCK(ptr)->size;
-			size_t block_size = ALLOC_SIZE(ALLOC_BLOCK(ptr)->size);
-			ALLOC_CHECK(ALLOC_BLOCK(ptr));
-			ALLOC_LIST_REMOVE(ALLOC_BLOCK(ptr));
-#if MEMPROF_DEBUG
-			memset(ALLOC_BLOCK(ptr), 0, ALLOC_SIZE(ALLOC_BLOCK(ptr)->size));
-#endif
-			free(ALLOC_BLOCK(ptr));
-			decr_memory_usage(size, block_size);
-			unmark_own_alloc(&allocs_set, ptr);
-		}
-	}
-
-	MALLOC_HOOK_SAVE_OLD();
-	MALLOC_HOOK_SET_OWN();
-}
-
-static memprof_used void * memalign_hook(size_t alignment, size_t size, const void *caller)
-{
-	/* TODO: would require special handling in free and realloc */
-	return malloc_hook(size, caller);
-}
-
-void * zend_malloc_handler(size_t size)
-{
-	return malloc_hook(size, NULL);
-}
-
-void zend_free_handler(void * ptr)
-{
-	if (!ptr) {
-		return;
-	}
-
-	if (is_own_alloc(&allocs_set, ptr)) {
-		free_hook(ptr, NULL);
-	} else {
-		zend_mm_heap * heap = zend_mm_set_heap(orig_heap);
-		zend_mm_free(heap, ptr);
-		zend_mm_set_heap(heap);
-	}
-}
-
-void * zend_realloc_handler(void * ptr, size_t size)
-{
-	if (!ptr) {
-		return zend_malloc_handler(size);
-	}
-
-	if (is_own_alloc(&allocs_set, ptr)) {
-		return realloc_hook(ptr, size, NULL);
-	} else {
-		zend_mm_heap * heap = zend_mm_set_heap(orig_heap);
-		void * result = zend_mm_realloc(heap, ptr, size);
-		zend_mm_set_heap(heap);
-		return result;
-	}
 }
 
 static void memprof_zend_execute(zend_op_array *op_array TSRMLS_DC)
@@ -564,23 +731,56 @@ static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, i
 	}
 }
 
+static void memprof_enable()
+{
+	alloc_buckets_init(&current_alloc_buckets);
+
+	init_frame(&default_frame, NULL, "root", sizeof("root")-1);
+	default_frame.calls = 1;
+
+	MALLOC_HOOK_SAVE_OLD();
+	MALLOC_HOOK_SET_OWN();
+
+	memprof_enabled = 1;
+
+	if (is_zend_mm()) {
+		/* There is no way to completely free a zend_mm_heap with custom
+		 * handlers, so we have to allocated it ourselves. We don't know the
+		 * actual size of a _zend_mm_heap struct, but this should be enough. */
+		zheap = malloc(zend_mm_heap_size);
+		memset(zheap, 0, zend_mm_heap_size);
+		zend_mm_set_custom_handlers(zheap, zend_malloc_handler, zend_free_handler, zend_realloc_handler);
+		orig_zheap = zend_mm_set_heap(zheap);
+	} else {
+		zheap = NULL;
+		orig_zheap = NULL;
+	}
+}
+
+static void memprof_disable()
+{
+	if (zheap) {
+		zend_mm_set_heap(orig_zheap);
+		free(zheap);
+	}
+
+	MALLOC_HOOK_RESTORE_OLD();
+
+	memprof_enabled = 0;
+
+	destroy_frame(&default_frame);
+
+	alloc_buckets_destroy(&current_alloc_buckets);
+
+	JudyLFreeArray(&allocs_set, PJE0);
+	allocs_set = (Pvoid_t) NULL;
+}
+
 ZEND_DLEXPORT int memprof_zend_startup(zend_extension *extension)
 {
 	int ret;
 
 	memprof_initialized = 1;
-
-	MALLOC_HOOK_SAVE_OLD();
-	MALLOC_HOOK_SET_OWN();
-
-	if (is_zend_mm()) {
-		zend_mm_heap * heap = zend_mm_startup();
-		zend_mm_set_custom_handlers(heap, zend_malloc_handler, zend_free_handler, zend_realloc_handler);
-		orig_heap = zend_mm_set_heap(heap);
-	}
-
-	init_frame(&default_frame, NULL, "root", sizeof("root")-1);
-	default_frame.calls = 1;
 
 	zend_hash_del(CG(function_table), "memory_get_usage", sizeof("memory_get_usage"));
 	zend_hash_del(CG(function_table), "memory_get_peak_usage", sizeof("memory_get_peak_usage"));
@@ -588,28 +788,6 @@ ZEND_DLEXPORT int memprof_zend_startup(zend_extension *extension)
 	ret = zend_startup_module(&memprof_module_entry);
 
 	return ret;
-}
-
-ZEND_DLEXPORT void memprof_zend_shutdown(zend_extension *extension)
-{
-	/* avoids dlunload, since malloc hooks are still set */
-	extension->handle = NULL;
-
-	destroy_frame(&default_frame);
-
-	/* this is still needed, so we can't free it */
-	/* Judy1FreeArray(&allocs_set, PJE0); */
-
-	if (orig_heap) {
-		zend_mm_heap * heap;
-		heap = zend_mm_set_heap(orig_heap);
-
-#if 0
-		/* hack to re-set ->use_zend_alloc to 1 */
-		*(int*)heap = 1;
-#endif
-		zend_mm_shutdown(heap, 1, 1);
-	}
 }
 
 #ifndef ZEND_EXT_API
@@ -624,7 +802,7 @@ ZEND_DLEXPORT zend_extension zend_extension_entry = {
 	"https://github.com/arnaud-lb/php-memprof",
 	"Copyright (c) 2012",
 	memprof_zend_startup,
-	memprof_zend_shutdown,
+	NULL,
 	NULL,           /* activate_func_t */
 	NULL,           /* deactivate_func_t */
 	NULL,           /* message_handler_func_t */
@@ -749,6 +927,7 @@ PHP_MSHUTDOWN_FUNCTION(memprof)
  */
 PHP_RINIT_FUNCTION(memprof)
 {
+	memprof_enable();
 	track_mallocs = 1;
 
 	return SUCCESS;
@@ -762,9 +941,7 @@ PHP_RSHUTDOWN_FUNCTION(memprof)
 {
 	track_mallocs = 0;
 
-	destroy_frame(&default_frame);
-	init_frame(&default_frame, NULL, "root", sizeof("root")-1);
-	default_frame.calls = 1;
+	memprof_disable();
 
 	return SUCCESS;
 }
