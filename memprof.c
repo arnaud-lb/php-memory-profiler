@@ -208,8 +208,6 @@ static const size_t zend_mm_heap_size = 4096;
 static zend_mm_heap * zheap = NULL;
 static zend_mm_heap * orig_zheap = NULL;
 
-/* ZEND_DECLARE_MODULE_GLOBALS(memprof) */
-
 #define ALLOC_INIT(alloc, size) alloc_init(alloc, size)
 
 #define ALLOC_LIST_INSERT_HEAD(head, elem) alloc_list_insert_head(head, elem)
@@ -850,9 +848,9 @@ zend_module_entry memprof_module_entry = {
 	MEMPROF_NAME,
 	memprof_functions,
 	PHP_MINIT(memprof),
-	PHP_MSHUTDOWN(memprof),
-	PHP_RINIT(memprof),        /* Replace with NULL if there's nothing to do at request start */
-	PHP_RSHUTDOWN(memprof),    /* Replace with NULL if there's nothing to do at request end */
+	NULL,
+	NULL,
+	PHP_RSHUTDOWN(memprof),
 	PHP_MINFO(memprof),
 #if ZEND_MODULE_API_NO >= 20010901
 	MEMPROF_VERSION,
@@ -865,35 +863,10 @@ zend_module_entry memprof_module_entry = {
 ZEND_GET_MODULE(memprof)
 #endif
 
-/* {{{ PHP_INI
- */
-/* Remove comments and fill if you need to have entries in php.ini
-PHP_INI_BEGIN()
-	STD_PHP_INI_ENTRY("memprof.global_value",      "42", PHP_INI_ALL, OnUpdateLong, global_value, zend_memprof_globals, memprof_globals)
-	STD_PHP_INI_ENTRY("memprof.global_string", "foobar", PHP_INI_ALL, OnUpdateString, global_string, zend_memprof_globals, memprof_globals)
-PHP_INI_END()
-*/
-/* }}} */
-
-/* {{{ php_memprof_init_globals
- */
-/*
-static void php_memprof_init_globals(zend_memprof_globals *memprof_globals)
-{
-	memset(memprof_globals, 0, sizeof(*memprof_globals));
-}
-*/
-/* }}} */
-
 /* {{{ PHP_MINIT_FUNCTION
  */
 PHP_MINIT_FUNCTION(memprof)
 {
-	/* ZEND_INIT_MODULE_GLOBALS(memprof, php_memprof_init_globals, memprof_globals); */
-	/* If you have INI entries, uncomment these lines 
-	REGISTER_INI_ENTRIES();
-	*/
-
 	if (!memprof_initialized) {
 		zend_error(E_CORE_ERROR, "memprof must be loaded as a Zend extension (zend_extension=/path/to/memprof.so)");
 		return FAILURE;
@@ -903,28 +876,6 @@ PHP_MINIT_FUNCTION(memprof)
 }
 /* }}} */
 
-/* {{{ PHP_MSHUTDOWN_FUNCTION
- */
-PHP_MSHUTDOWN_FUNCTION(memprof)
-{
-	/* uncomment this line if you have INI entries
-	UNREGISTER_INI_ENTRIES();
-	*/
-
-	return SUCCESS;
-}
-/* }}} */
-
-/* Remove if there's nothing to do at request start */
-/* {{{ PHP_RINIT_FUNCTION
- */
-PHP_RINIT_FUNCTION(memprof)
-{
-	return SUCCESS;
-}
-/* }}} */
-
-/* Remove if there's nothing to do at request end */
 /* {{{ PHP_RSHUTDOWN_FUNCTION
  */
 PHP_RSHUTDOWN_FUNCTION(memprof)
@@ -943,11 +894,10 @@ PHP_MINFO_FUNCTION(memprof)
 {
 	php_info_print_table_start();
 	php_info_print_table_header(2, "memprof support", "enabled");
+#if MEMPROF_DEBUG
+	php_info_print_table_header(2, "debug build", "Yes");
+#endif
 	php_info_print_table_end();
-
-	/* Remove comments if you have entries in php.ini
-	DISPLAY_INI_ENTRIES();
-	*/
 }
 /* }}} */
 

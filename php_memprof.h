@@ -58,17 +58,6 @@ PHP_FUNCTION(memprof_enable);
 PHP_FUNCTION(memprof_disable);
 PHP_FUNCTION(memprof_enabled);
 
-/*
-ZEND_BEGIN_MODULE_GLOBALS(memprof)
-ZEND_END_MODULE_GLOBALS(memprof)
-*/
-
-#ifdef ZTS
-#define MEMPROF_G(v) TSRMG(memprof_globals_id, zend_memprof_globals *, v)
-#else
-#define MEMPROF_G(v) (memprof_globals.v)
-#endif
-
 #endif	/* PHP_MEMPROF_H */
 
 
