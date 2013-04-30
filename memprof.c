@@ -193,6 +193,8 @@ static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, ze
 #define zend_execute_fn zend_execute_ex
 #endif
 
+static PHP_INI_MH((*origOnChangeMemoryLimit)) = NULL;
+
 static int memprof_initialized = 0;
 static int memprof_enabled = 0;
 static int track_mallocs = 0;
@@ -713,6 +715,25 @@ static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, z
 	}
 }
 
+static PHP_INI_MH(OnChangeMemoryLimit)
+{
+	int ret;
+
+	if (!origOnChangeMemoryLimit) {
+		return FAILURE;
+	}
+
+	ret = origOnChangeMemoryLimit(entry, new_value, new_value_length, mh_arg1, mh_arg2, mh_arg3, stage TSRMLS_CC);
+
+	if (memprof_enabled) {
+		zend_mm_set_heap(orig_zheap);
+		ret = zend_set_memory_limit(PG(memory_limit));
+		zend_mm_set_heap(zheap);
+	}
+
+	return ret;
+}
+
 static void memprof_enable()
 {
 	alloc_buckets_init(&current_alloc_buckets);
@@ -848,7 +869,7 @@ zend_module_entry memprof_module_entry = {
 	MEMPROF_NAME,
 	memprof_functions,
 	PHP_MINIT(memprof),
-	NULL,
+	PHP_MSHUTDOWN(memprof),
 	NULL,
 	PHP_RSHUTDOWN(memprof),
 	PHP_MINFO(memprof),
@@ -867,9 +888,34 @@ ZEND_GET_MODULE(memprof)
  */
 PHP_MINIT_FUNCTION(memprof)
 {
+	zend_ini_entry * entry;
+
 	if (!memprof_initialized) {
 		zend_error(E_CORE_ERROR, "memprof must be loaded as a Zend extension (zend_extension=/path/to/memprof.so)");
 		return FAILURE;
+	}
+
+	if (SUCCESS != zend_hash_find(EG(ini_directives), "memory_limit", sizeof("memory_limit"), (void**) &entry)) {
+		zend_error(E_CORE_ERROR, "memory_limit ini entry not found");
+		return FAILURE;
+	}
+
+	origOnChangeMemoryLimit = entry->on_modify;
+	entry->on_modify = OnChangeMemoryLimit;
+
+	return SUCCESS;
+}
+/* }}} */
+
+/* {{{ PHP_MSHUTDOWN_FUNCTION
+ */
+PHP_MSHUTDOWN_FUNCTION(memprof)
+{
+	if (origOnChangeMemoryLimit) {
+		zend_ini_entry * entry;
+		if (SUCCESS == zend_hash_find(EG(ini_directives), "memory_limit", sizeof("memory_limit"), (void**) &entry)) {
+			entry->on_modify = origOnChangeMemoryLimit;
+		}
 	}
 
 	return SUCCESS;
