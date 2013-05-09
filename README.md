@@ -62,15 +62,13 @@ file_get_contents() are shown as huge memory consumers.
 
 ## Loading the extension
 
-The extension must be loaded as a zend_extension.
+The extension can be loaded on the command line, just for one script:
 
-It can be loaded on the command line, just for one script:
-
-    php -dzend_extension=/absolute/path/to/memprof.so script.php
+    php -dextension=memprof.so script.php
 
 Or permanently, in php.ini:
 
-    zend_extension=/absolute/path/to/memprof.so
+    extension=memprof.so
 
 ## Usage
 
@@ -85,11 +83,15 @@ Example:
 ```
 <?php
 
-memprof_enable();
+if (function_exists('memprof_enable')) {
+    memprof_enable();
+}
 
 do_some_work();
 
-memprof_dump_callgrind(fopen("/tmp/callgrind.out", "w"));
+if (function_exists('memprof_enable')) {
+    memprof_dump_callgrind(fopen("/tmp/callgrind.out", "w"));
+}
 ```
 
 ### memprof_enabled()

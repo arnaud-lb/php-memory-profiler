@@ -195,7 +195,6 @@ static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, ze
 
 static PHP_INI_MH((*origOnChangeMemoryLimit)) = NULL;
 
-static int memprof_initialized = 0;
 static int memprof_enabled = 0;
 static int track_mallocs = 0;
 
@@ -793,16 +792,7 @@ static void memprof_disable()
 
 ZEND_DLEXPORT int memprof_zend_startup(zend_extension *extension)
 {
-	int ret;
-
-	memprof_initialized = 1;
-
-	zend_hash_del(CG(function_table), "memory_get_usage", sizeof("memory_get_usage"));
-	zend_hash_del(CG(function_table), "memory_get_peak_usage", sizeof("memory_get_peak_usage"));
-
-	ret = zend_startup_module(&memprof_module_entry);
-
-	return ret;
+	return zend_startup_module(&memprof_module_entry);
 }
 
 #ifndef ZEND_EXT_API
@@ -854,9 +844,16 @@ const zend_function_entry memprof_functions[] = {
 	PHP_FE(memprof_dump_array, arginfo_void)
 	PHP_FE(memprof_dump_callgrind, arginfo_memprof_dump_callgrind)
 	PHP_FE(memprof_dump_pprof, arginfo_memprof_dump_pprof)
+	PHP_FE_END    /* Must be the last line in memprof_functions[] */
+};
+/* }}} */
+
+/* {{{ memprof_functions_overrides[]
+ */
+const zend_function_entry memprof_function_overrides[] = {
 	PHP_FALIAS(memory_get_peak_usage, memprof_memory_get_peak_usage, arginfo_memprof_memory_get_usage)
 	PHP_FALIAS(memory_get_usage, memprof_memory_get_usage, arginfo_memprof_memory_get_usage)
-	PHP_FE_END    /* Must be the last line in memprof_functions[] */
+	PHP_FE_END    /* Must be the last line in memprof_function_overrides[] */
 };
 /* }}} */
 
@@ -889,11 +886,7 @@ ZEND_GET_MODULE(memprof)
 PHP_MINIT_FUNCTION(memprof)
 {
 	zend_ini_entry * entry;
-
-	if (!memprof_initialized) {
-		zend_error(E_CORE_ERROR, "memprof must be loaded as a Zend extension (zend_extension=/path/to/memprof.so)");
-		return FAILURE;
-	}
+	const zend_function_entry * fentry;
 
 	if (SUCCESS != zend_hash_find(EG(ini_directives), "memory_limit", sizeof("memory_limit"), (void**) &entry)) {
 		zend_error(E_CORE_ERROR, "memory_limit ini entry not found");
@@ -902,6 +895,12 @@ PHP_MINIT_FUNCTION(memprof)
 
 	origOnChangeMemoryLimit = entry->on_modify;
 	entry->on_modify = OnChangeMemoryLimit;
+
+	for (fentry = memprof_function_overrides; fentry->fname; fentry++) {
+		size_t name_len = strlen(fentry->fname);
+		zend_hash_del(CG(function_table), fentry->fname, name_len+1);
+	}
+	zend_register_functions(NULL, memprof_function_overrides, NULL, type);
 
 	return SUCCESS;
 }
