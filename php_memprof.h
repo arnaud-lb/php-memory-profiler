@@ -1,16 +1,12 @@
 /*
   +----------------------------------------------------------------------+
-  | PHP Version 5                                                        |
+  | Memprof                                                              |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2012 Arnaud Le Blanc                              |
+  | Copyright (c) 2012-2013 Arnaud Le Blanc                              |
   +----------------------------------------------------------------------+
-  | This source file is subject to version 3.01 of the PHP license,      |
-  | that is bundled with this package in the file LICENSE, and is        |
-  | available through the world-wide-web at the following url:           |
-  | http://www.php.net/license/3_01.txt                                  |
-  | If you did not receive a copy of the PHP license and are unable to   |
-  | obtain it through the world-wide-web, please send a note to          |
-  | license@php.net so we can mail you a copy immediately.               |
+  | Redistribution and use in source and binary forms, with or without   |
+  | modification, are permitted provided that the conditions mentioned   |
+  | in the accompanying LICENSE file are met.                            |
   +----------------------------------------------------------------------+
   | Author: Arnaud Le Blanc <arnaud.lb@gmail.com>                        |
   +----------------------------------------------------------------------+
