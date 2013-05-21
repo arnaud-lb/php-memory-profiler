@@ -50,7 +50,7 @@ file_get_contents() are shown as huge memory consumers.
 
 ## Dependencies
 
- * [Judy Libray][3] (e.g. libjudy-dev or judy package)
+ * [Judy Library][3] (e.g. libjudy-dev or judy package)
  * C Library with [malloc hooks][1] (optional; allows to track persistent allocations too)
 
 ## Install
@@ -157,11 +157,11 @@ $ pprof --text profile.heap
 $dump = memprof_dump_array();
 ```
 
-The dump exposes the following informations:
+The dump exposes the following information:
 
- * Inclusive and exlusive memory usage of functions (counting only the memory
+ * Inclusive and exclusive memory usage of functions (counting only the memory
    that has is still in use when memprof_dump_array is called)
- * Inclusive and exlusive blocks count of functions (number of allocated;
+ * Inclusive and exclusive blocks count of functions (number of allocated;
    counting only the blocks that are still in use when memprof_dump_array is
    called)
  * The data is presented in call stacks. This way, if a function is called from
