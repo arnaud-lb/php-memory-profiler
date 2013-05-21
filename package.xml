@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package packagerversion="1.9.4" version="2.1" xmlns="http://pear.php.net/dtd/package-2.1" xmlns:tasks="http://pear.php.net/dtd/tasks-1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pear.php.net/dtd/tasks-1.0     http://pear.php.net/dtd/tasks-1.0.xsd     http://pear.php.net/dtd/package-2.1     http://pear.php.net/dtd/package-2.1.xsd">
+ <name>memprof</name>
+ <channel>pecl.php.net</channel>
+ <summary>memory usage profiler</summary>
+ <description>Memory usage profiler for PHP scripts.</description>
+ <lead>
+  <name>Arnaud Le Blanc</name>
+  <user>lbarnaud</user>
+  <email>lbarnaud@php.net</email>
+  <active>yes</active>
+ </lead>
+ <date>2013-05-21</date>
+ <time>17:05:36</time>
+ <version>
+  <release>1.0.0</release>
+  <api>1.0.0</api>
+ </version>
+ <stability>
+  <release>stable</release>
+  <api>stable</api>
+ </stability>
+ <license>BSD</license>
+ <notes>
+PECL release
+ </notes>
+ <contents>
+  <dir name="/">
+   <file md5sum="7db458897ceae748d52e9d7fe4112c52" name="config.m4" role="src" />
+   <file md5sum="6cd01950d556aa508ba9161f04199fa9" name="memprof.c" role="src" />
+   <file md5sum="9ba7ffec732c04256a54eb00e5adb78d" name="php_memprof.h" role="src" />
+   <file md5sum="063ebbbe4d3d3a3e38bc2c4cf38f1ea1" name="util.c" role="src" />
+   <file md5sum="2fa2c0dd5f8fdac57c85318dd8c98565" name="util.h" role="src" />
+  </dir>
+ </contents>
+ <dependencies>
+  <required>
+   <php>
+    <min>5.3.0</min>
+   </php>
+   <pearinstaller>
+    <min>1.4.8</min>
+   </pearinstaller>
+  </required>
+ </dependencies>
+ <providesextension>memprof</providesextension>
+ <extsrcrelease />
+</package>
