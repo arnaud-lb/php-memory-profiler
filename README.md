@@ -55,6 +55,14 @@ file_get_contents() are shown as huge memory consumers.
 
 ## Install
 
+### Using PECL
+
+    pecl install memprof
+
+### Manually
+
+Download the source and run the following commands in the source directory:
+
     phpize
     ./configure
     make
