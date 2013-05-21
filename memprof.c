@@ -800,8 +800,8 @@ ZEND_DLEXPORT zend_extension zend_extension_entry = {
 	MEMPROF_NAME,
 	MEMPROF_VERSION,
 	"Arnaud Le Blanc",
-	"https://github.com/arnaud-lb/php-memprof",
-	"Copyright (c) 2012",
+	"https://github.com/arnaud-lb/php-memory-profiler",
+	"Copyright (c) 2013",
 	memprof_zend_startup,
 	NULL,
 	NULL,           /* activate_func_t */
