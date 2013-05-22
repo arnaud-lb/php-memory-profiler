@@ -743,7 +743,7 @@ static void memprof_enable()
 
 	if (is_zend_mm()) {
 		/* There is no way to completely free a zend_mm_heap with custom
-		 * handlers, so we have to allocated it ourselves. We don't know the
+		 * handlers, so we have to allocate it ourselves. We don't know the
 		 * actual size of a _zend_mm_heap struct, but this should be enough. */
 		zheap = malloc(zend_mm_heap_size);
 		memset(zheap, 0, zend_mm_heap_size);
