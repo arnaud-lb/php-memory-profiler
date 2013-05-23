@@ -817,18 +817,18 @@ ZEND_DLEXPORT zend_extension zend_extension_entry = {
 };
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_memprof_dump_callgrind, 0, 0, 1)
-	ZEND_ARG_TYPE_INFO(0, handle, IS_RESOURCE, 0)
+	ZEND_ARG_INFO(0, handle)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_memprof_dump_pprof, 0, 0, 1)
-	ZEND_ARG_TYPE_INFO(0, handle, IS_RESOURCE, 0)
+	ZEND_ARG_INFO(0, handle)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_void, 0, 0, 0)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_memprof_memory_get_usage, 0, 0, 0)
-	ZEND_ARG_TYPE_INFO(0, real, IS_BOOL, 0)
+	ZEND_ARG_INFO(0, real)
 ZEND_END_ARG_INFO()
 
 /* {{{ memprof_functions[]

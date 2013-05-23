@@ -39,10 +39,6 @@ extern zend_module_entry memprof_module_entry;
 #   define PHP_FE_END { NULL, NULL, NULL, 0, 0 }
 #endif
 
-#ifndef ZEND_ARG_TYPE_INFO
-#	define ZEND_ARG_TYPE_INFO(pass_by_ref, name, type_hint, allow_null) ZEND_ARG_INFO(pass_by_ref, name)
-#endif
-
 PHP_MINIT_FUNCTION(memprof);
 PHP_MSHUTDOWN_FUNCTION(memprof);
 PHP_RINIT_FUNCTION(memprof);
