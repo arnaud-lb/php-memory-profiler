@@ -48,6 +48,10 @@ In script 2, the allocated memory remains allocated after file_get_contents()
 and a() return, and when memprof_dump_array() is called. This time a() and
 file_get_contents() are shown as huge memory consumers.
 
+## How it works
+
+See [INTERNALS.md][7]
+
 ## Dependencies
 
  * [Judy Library][3] (e.g. libjudy-dev or judy package)
@@ -256,4 +260,5 @@ Example output:
 [4]: https://google-perftools.googlecode.com/svn/trunk/doc/heapprofile.html
 [5]: https://google-perftools.googlecode.com/
 [6]: https://www.google.com/search?q=qcachegrind
+[7]: https://github.com/arnaud-lb/php-memory-profiler/blob/master/INTERNALS.md
 
