@@ -32,16 +32,11 @@
 #endif
 #include <assert.h>
 
-#ifdef ZTS
-	/* TODO: support ZTS builds (without malloc hooks) */
-#	error "ZTS build not supported (yet)"
-#endif
-
 #if MEMPROF_CONFIGURE_VERSION != 3
 #	error Please rebuild configure (run phpize and reconfigure)
 #endif
 
-#if HAVE_MALLOC_HOOKS
+#if defined(HAVE_MALLOC_HOOKS) && !defined(ZTS)
 #	include <malloc.h>
 
 #	if MEMPROF_DEBUG
@@ -163,7 +158,7 @@ typedef struct _alloc_buckets {
 	alloc_bucket_item ** buckets;
 } alloc_buckets;
 
-#if HAVE_MALLOC_HOOKS
+#if defined(HAVE_MALLOC_HOOKS) && !defined(ZTS)
 static void * malloc_hook(size_t size, const void *caller);
 static void * realloc_hook(void *ptr, size_t size, const void *caller);
 static void free_hook(void *ptr, const void *caller);
@@ -360,7 +355,7 @@ static frame * new_frame(frame * prev, char * name, size_t name_len)
 	return f;
 }
 
-static frame * get_or_create_frame(zend_execute_data * current_execute_data, frame * prev)
+static frame * get_or_create_frame(zend_execute_data * current_execute_data, frame * prev TSRMLS_DC)
 {
 	frame * f;
 	frame ** f_pp;
@@ -368,7 +363,7 @@ static frame * get_or_create_frame(zend_execute_data * current_execute_data, fra
 	char name[256];
 	size_t name_len;
 
-	name_len = get_function_name(current_execute_data, name, sizeof(name));
+	name_len = get_function_name(current_execute_data, name, sizeof(name) TSRMLS_CC);
 
 	if (SUCCESS == zend_hash_find(&prev->next_cache, name, name_len+1, (void**) &f_pp)) {
 		f = *f_pp;
@@ -434,7 +429,7 @@ alloc * is_own_alloc(Pvoid_t * set, void * ptr)
 	}
 }
 
-#if HAVE_MALLOC_HOOKS
+#if defined(HAVE_MALLOC_HOOKS) && !defined(ZTS)
 
 static void * malloc_hook(size_t size, const void *caller)
 {
@@ -645,7 +640,7 @@ static void memprof_zend_execute(zend_execute_data *execute_data TSRMLS_DC)
 {
 	WITHOUT_MALLOC_TRACKING {
 
-		current_frame = get_or_create_frame(EG(current_execute_data), current_frame);
+		current_frame = get_or_create_frame(EG(current_execute_data), current_frame TSRMLS_CC);
 		current_frame->calls++;
 		current_alloc_list = &current_frame->allocs;
 
@@ -683,7 +678,7 @@ static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, z
 	WITHOUT_MALLOC_TRACKING {
 
 		if (!ignore) {
-			current_frame = get_or_create_frame(execute_data_ptr, current_frame);
+			current_frame = get_or_create_frame(execute_data_ptr, current_frame TSRMLS_CC);
 			current_frame->calls++;
 			current_alloc_list = &current_frame->allocs;
 		}
@@ -692,15 +687,15 @@ static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, z
 
 #if PHP_VERSION_ID < 50500
 	if (!old_zend_execute_internal) {
-		execute_internal(execute_data_ptr, return_value_used);
+		execute_internal(execute_data_ptr, return_value_used TSRMLS_CC);
 	} else {
-		old_zend_execute_internal(execute_data_ptr, return_value_used);
+		old_zend_execute_internal(execute_data_ptr, return_value_used TSRMLS_CC);
 	}
 #else
 	if (!old_zend_execute_internal) {
-		execute_internal(execute_data_ptr, fci, return_value_used);
+		execute_internal(execute_data_ptr, fci, return_value_used TSRMLS_CC);
 	} else {
-		old_zend_execute_internal(execute_data_ptr, fci, return_value_used);
+		old_zend_execute_internal(execute_data_ptr, fci, return_value_used TSRMLS_CC);
 	}
 #endif
 
@@ -721,15 +716,15 @@ static PHP_INI_MH(OnChangeMemoryLimit)
 	ret = origOnChangeMemoryLimit(entry, new_value, new_value_length, mh_arg1, mh_arg2, mh_arg3, stage TSRMLS_CC);
 
 	if (memprof_enabled) {
-		zend_mm_set_heap(orig_zheap);
+		zend_mm_set_heap(orig_zheap TSRMLS_CC);
 		ret = zend_set_memory_limit(PG(memory_limit));
-		zend_mm_set_heap(zheap);
+		zend_mm_set_heap(zheap TSRMLS_CC);
 	}
 
 	return ret;
 }
 
-static void memprof_enable()
+static void memprof_enable(TSRMLS_D)
 {
 	alloc_buckets_init(&current_alloc_buckets);
 
@@ -741,14 +736,14 @@ static void memprof_enable()
 
 	memprof_enabled = 1;
 
-	if (is_zend_mm()) {
+	if (is_zend_mm(TSRMLS_C)) {
 		/* There is no way to completely free a zend_mm_heap with custom
 		 * handlers, so we have to allocate it ourselves. We don't know the
 		 * actual size of a _zend_mm_heap struct, but this should be enough. */
 		zheap = malloc(zend_mm_heap_size);
 		memset(zheap, 0, zend_mm_heap_size);
 		zend_mm_set_custom_handlers(zheap, zend_malloc_handler, zend_free_handler, zend_realloc_handler);
-		orig_zheap = zend_mm_set_heap(zheap);
+		orig_zheap = zend_mm_set_heap(zheap TSRMLS_CC);
 	} else {
 		zheap = NULL;
 		orig_zheap = NULL;
@@ -762,7 +757,7 @@ static void memprof_enable()
 	track_mallocs = 1;
 }
 
-static void memprof_disable()
+static void memprof_disable(TSRMLS_D)
 {
 	track_mallocs = 0;
 
@@ -770,7 +765,7 @@ static void memprof_disable()
 	zend_execute_internal = old_zend_execute_internal;
 
 	if (zheap) {
-		zend_mm_set_heap(orig_zheap);
+		zend_mm_set_heap(orig_zheap TSRMLS_CC);
 		free(zheap);
 	}
 
@@ -896,7 +891,7 @@ PHP_MINIT_FUNCTION(memprof)
 		size_t name_len = strlen(fentry->fname);
 		zend_hash_del(CG(function_table), fentry->fname, name_len+1);
 	}
-	zend_register_functions(NULL, memprof_function_overrides, NULL, type);
+	zend_register_functions(NULL, memprof_function_overrides, NULL, type TSRMLS_CC);
 
 	return SUCCESS;
 }
@@ -922,7 +917,7 @@ PHP_MSHUTDOWN_FUNCTION(memprof)
 PHP_RSHUTDOWN_FUNCTION(memprof)
 {
 	if (memprof_enabled) {
-		memprof_disable();
+		memprof_disable(TSRMLS_C);
 	}
 
 	return SUCCESS;
@@ -1294,11 +1289,11 @@ PHP_FUNCTION(memprof_memory_get_usage)
 	}
 
 	if (memprof_enabled && orig_zheap) {
-		zend_mm_set_heap(orig_zheap);
-		RETVAL_LONG(zend_memory_usage(real));
-		zend_mm_set_heap(zheap);
+		zend_mm_set_heap(orig_zheap TSRMLS_CC);
+		RETVAL_LONG(zend_memory_usage(real TSRMLS_CC));
+		zend_mm_set_heap(zheap TSRMLS_CC);
 	} else {
-		RETVAL_LONG(zend_memory_usage(real));
+		RETVAL_LONG(zend_memory_usage(real TSRMLS_CC));
 	}
 }
 /* }}} */
@@ -1314,11 +1309,11 @@ PHP_FUNCTION(memprof_memory_get_peak_usage)
 	}
 
 	if (memprof_enabled && orig_zheap) {
-		zend_mm_set_heap(orig_zheap);
-		RETVAL_LONG(zend_memory_peak_usage(real));
-		zend_mm_set_heap(zheap);
+		zend_mm_set_heap(orig_zheap TSRMLS_CC);
+		RETVAL_LONG(zend_memory_peak_usage(real TSRMLS_CC));
+		zend_mm_set_heap(zheap TSRMLS_CC);
 	} else {
-		RETVAL_LONG(zend_memory_peak_usage(real));
+		RETVAL_LONG(zend_memory_peak_usage(real TSRMLS_CC));
 	}
 }
 /* }}} */
@@ -1336,7 +1331,7 @@ PHP_FUNCTION(memprof_enable)
 		return;
 	}
 
-	memprof_enable();
+	memprof_enable(TSRMLS_C);
 
 	RETURN_TRUE;
 }
@@ -1355,7 +1350,7 @@ PHP_FUNCTION(memprof_disable)
 		return;
 	}
 
-	memprof_disable();
+	memprof_disable(TSRMLS_C);
 
 	RETURN_TRUE;
 }
