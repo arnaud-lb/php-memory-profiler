@@ -10,6 +10,7 @@ if (PHP_MEMPROF != "no") {
 
 		ADD_FLAG("CFLAGS_MEMPROF", "/D MEMPROF_CONFIGURE_VERSION=3");
 		ADD_FLAG("CFLAGS_MEMPROF", "/D HAVE_JUDYLIB=1");
+		ADD_FLAG("CFLAGS_MEMPROF", "/D JU_WIN");
 	} else {
 		WARNING("judy not enabled; libraries and headers not found");
 	}
