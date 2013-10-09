@@ -26,11 +26,14 @@ PECL release
  </notes>
  <contents>
   <dir name="/">
-   <file md5sum="7db458897ceae748d52e9d7fe4112c52" name="config.m4" role="src" />
-   <file md5sum="6cd01950d556aa508ba9161f04199fa9" name="memprof.c" role="src" />
-   <file md5sum="9ba7ffec732c04256a54eb00e5adb78d" name="php_memprof.h" role="src" />
-   <file md5sum="063ebbbe4d3d3a3e38bc2c4cf38f1ea1" name="util.c" role="src" />
-   <file md5sum="2fa2c0dd5f8fdac57c85318dd8c98565" name="util.h" role="src" />
+   <file name="config.m4" role="src" />
+   <file name="memprof.c" role="src" />
+   <file name="php_memprof.h" role="src" />
+   <file name="util.c" role="src" />
+   <file name="util.h" role="src" />
+   <file name="LICENSE" role="doc" />
+   <file name="INTERNALS.md" role="doc" />
+   <file name="README.md" role="doc" />
   </dir>
  </contents>
  <dependencies>
