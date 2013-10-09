@@ -1,0 +1,17 @@
+// $Id$
+// vim:ft=javascript
+
+ARG_ENABLE("memprof", "memprof support", "no");
+
+if (PHP_MEMPROF != "no") {
+	if (CHECK_LIB("libJudy_a.lib;libJudy.lib", "memprof", PHP_MEMPROF) && CHECK_HEADER_ADD_INCLUDE("Judy.h", "CFLAGS_MEMPROF")) {
+
+		EXTENSION("memprof", "memprof.c util.c");
+
+		ADD_FLAG("CFLAGS_MEMPROF", "/D MEMPROF_CONFIGURE_VERSION=3");
+		ADD_FLAG("CFLAGS_MEMPROF", "/D HAVE_JUDYLIB=1");
+	} else {
+		WARNING("judy not enabled; libraries and headers not found");
+	}
+
+}
