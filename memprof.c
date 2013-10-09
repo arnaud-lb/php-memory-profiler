@@ -23,7 +23,11 @@
 #include "php_memprof.h"
 #include "zend_extensions.h"
 #include "zend_exceptions.h"
+#ifdef PHP_WIN32
+#include "win32/php_stdint.h"
+#else
 #include <stdint.h>
+#endif
 #include <sys/queue.h>
 #include "util.h"
 #include <Judy.h>
@@ -111,7 +115,9 @@
 
 #else /* HAVE_MALLOC_HOOKS */
 
+#ifndef PHP_WIN32
 #	warning No support for malloc hooks, this build will not track persistent allocations
+#endif
 
 #	define MALLOC_HOOK_CHECK_NOT_OWN()
 #	define MALLOC_HOOK_IS_SET() (__malloc_hook == malloc_hook)

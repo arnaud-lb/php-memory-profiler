@@ -33,6 +33,7 @@ PECL release
    <file name="util.c" role="src" />
    <file name="util.h" role="src" />
    <file name="LICENSE" role="doc" />
+   <file name="LICENSE.QUEUE.H" role="doc" />
    <file name="INTERNALS.md" role="doc" />
    <file name="README.md" role="doc" />
   </dir>

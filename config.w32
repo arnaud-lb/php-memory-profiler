@@ -4,13 +4,21 @@
 ARG_ENABLE("memprof", "memprof support", "no");
 
 if (PHP_MEMPROF != "no") {
-	if (CHECK_LIB("libJudy_a.lib;libJudy.lib", "memprof", PHP_MEMPROF) && CHECK_HEADER_ADD_INCLUDE("Judy.h", "CFLAGS_MEMPROF")) {
+	if (CHECK_LIB("libJudy_a.lib;libJudy.lib", "memprof", PHP_MEMPROF) &&
+		CHECK_HEADER_ADD_INCLUDE("Judy.h", "CFLAGS_MEMPROF") &&
+		CHECK_HEADER_ADD_INCLUDE("sys/queue.h", "CFLAGS_MEMPROF", configure_module_dirname + "\\win32")) {
 
 		EXTENSION("memprof", "memprof.c util.c");
 
 		ADD_FLAG("CFLAGS_MEMPROF", "/D MEMPROF_CONFIGURE_VERSION=3");
 		ADD_FLAG("CFLAGS_MEMPROF", "/D HAVE_JUDYLIB=1");
 		ADD_FLAG("CFLAGS_MEMPROF", "/D JU_WIN");
+
+		/* XXX malloc hooks are GNU specific, nevertheless some similar functionality is 
+		  present on windows. Lets see if we can do an abstraction layer.
+		ADD_FLAG("CFLAGS_MEMPROF", "/D HAVE_MALLOC_HOOKS");
+		*/
+
 	} else {
 		WARNING("judy not enabled; libraries and headers not found");
 	}
