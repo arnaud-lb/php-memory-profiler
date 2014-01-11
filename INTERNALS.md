@@ -1,5 +1,4 @@
-
-# Memprof internals
+# Memprof internals
 
 Memprof counts memory blocks allocated by PHP functions. It does so by hooking
 in memory allocation functions, and linking newly allocated blocks to the
@@ -33,7 +32,7 @@ the current frame.
 The result is a tree representing unique function call pathes, and allocation
 informations about each function call path.
 
-## Allocation lists
+## Allocation lists
 
 Informations about each allocation is stored in an ``_alloc`` struct,
 defined as follows:
@@ -104,7 +103,7 @@ Hooking in ``malloc`` calls allow to track persistent allocations made by
 PHP (i.e. allocations that should persist after script execution and are
 not done through the Zend Memory Manager).
 
-## Hooking in the Zend Memory Manager
+## Hooking in the Zend Memory Manager
 
 PHP uses the Zend Memory Manager for pretty much every single allocation,
 so hooking in the ZMM allows to track pretty much every allocation.
@@ -112,7 +111,7 @@ so hooking in the ZMM allows to track pretty much every allocation.
 Hooking is done by creating an alternate ZMM heap that proxies calls to the
 original ZMM heap.
 
-## Hooking in function calls
+## Hooking in function calls
 
 Hooking in function calls is done by proxying Zend Engine's ``zend_execute_fn``
 and ``zend_execute_internal`` functions. The former is called when the
