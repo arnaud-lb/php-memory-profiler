@@ -24,9 +24,9 @@ Every time a function is called, we look in ``next_cache`` to see if that
 function has already been called from the current function call path. If
 so, we just increment its number of calls. Else, we create a new frame.
 
-A pointer to the frame is stored in ``current_frame``.
+A pointer to the frame is stored in the ``current_frame`` variable.
 
-When the function returns, ``current_frame`` is pointed to the parent of
+When the function returns, ``current_frame`` is pointed back to the parent of
 the current frame.
 
 The result is a tree representing unique function call pathes, and allocation
