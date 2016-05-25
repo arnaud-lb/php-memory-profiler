@@ -249,8 +249,13 @@ Example output:
         )
     )
 
+## PHP 7
+
+php-memory-profiler does not support PHP 7 yet
+
 ## Todo
 
+ * PHP 7 support
  * Support for tracking persistent (non-zend-alloc) allocations when libc
    doesn't have malloc hooks
 
