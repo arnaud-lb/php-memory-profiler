@@ -49,7 +49,7 @@ size_t get_function_name(zend_execute_data * execute_data, char * buf, size_t bu
 
 	function_name = get_active_function_name();
 
-	if (function_name) {
+	if (function_name != NULL && function_name != ZSTR_VAL((zend_string*)NULL)) {
 		class_name = get_active_class_name(&call_type);
 	} else {
 		if (!execute_data->opline || execute_data->opline->opcode != ZEND_INCLUDE_OR_EVAL) {
