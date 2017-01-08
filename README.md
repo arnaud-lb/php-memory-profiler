@@ -132,9 +132,9 @@ in callgrind format. The file can then be read with tools such as
 memprof_dump_callgrind(fopen("output", "w"));
 ```
 
-Here is a KcacheGrind screenshot:
+Here is a QcacheGrind screenshot:
 
-![KCacheGrind screenshot](http://img820.imageshack.us/img820/5530/screenshot3kve.png)
+![QCacheGrind screenshot](https://raw.githubusercontent.com/arnaud-lb/php-memory-profiler/master/assets/qcachegrind.png)
 
 ### memprof_dump_pprof(resource $stream)
 
