@@ -1,5 +1,7 @@
 # php-memprof
 
+![Supported PHP versions: 7.x](https://img.shields.io/badge/php-7.x-blue.svg)
+
 php-memprof profiles memory usage of PHP scripts, and especially can tell which
 function has allocated every single byte of memory currently allocated.
 
@@ -251,11 +253,14 @@ Example output:
 
 ## PHP 7
 
-php-memory-profiler does not support PHP 7 yet
+The current branch supports PHP 7 only.
+
+## PHP 5
+
+The php5 branch supports PHP 5.
 
 ## Todo
 
- * PHP 7 support
  * Support for tracking persistent (non-zend-alloc) allocations when libc
    doesn't have malloc hooks
 
