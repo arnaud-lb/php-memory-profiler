@@ -18,7 +18,7 @@
 #define PHP_MEMPROF_H
 
 #define MEMPROF_NAME "memprof"
-#define MEMPROF_VERSION "1.0.0"
+#define PHP_MEMPROF_VERSION "2.0.0"
 
 extern zend_module_entry memprof_module_entry;
 #define phpext_memprof_ptr &memprof_module_entry
