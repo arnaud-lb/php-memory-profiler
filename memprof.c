@@ -774,7 +774,7 @@ ZEND_EXTENSION();
 
 ZEND_DLEXPORT zend_extension zend_extension_entry = {
 	MEMPROF_NAME,
-	MEMPROF_VERSION,
+	PHP_MEMPROF_VERSION,
 	"Arnaud Le Blanc",
 	"https://github.com/arnaud-lb/php-memory-profiler",
 	"Copyright (c) 2013",
@@ -843,7 +843,7 @@ zend_module_entry memprof_module_entry = {
 	PHP_RSHUTDOWN(memprof),
 	PHP_MINFO(memprof),
 #if ZEND_MODULE_API_NO >= 20010901
-	MEMPROF_VERSION,
+	PHP_MEMPROF_VERSION,
 #endif
 	STANDARD_MODULE_PROPERTIES
 };
