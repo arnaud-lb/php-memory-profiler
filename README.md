@@ -265,10 +265,10 @@ The php5 branch supports PHP 5.
    doesn't have malloc hooks
 
 [1]: https://www.gnu.org/software/libc/manual/html_node/Hooks-for-Malloc.html#Hooks-for-Malloc
-[2]: http://kcachegrind.sourceforge.net/html/Home.html
+[2]: https://kcachegrind.github.io/html/Home.html
 [3]: http://judy.sourceforge.net/index.html
-[4]: https://google-perftools.googlecode.com/svn/trunk/doc/heapprofile.html
-[5]: https://google-perftools.googlecode.com/
+[4]: https://github.com/google/pprof
+[5]: https://github.com/gperftools/gperftools
 [6]: https://www.google.com/search?q=qcachegrind
 [7]: https://github.com/arnaud-lb/php-memory-profiler/blob/master/INTERNALS.md
 
