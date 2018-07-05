@@ -1,4 +1,3 @@
-dnl $Id$
 dnl config.m4 for extension memprof
 
 PHP_ARG_ENABLE(memprof, whether to enable memprof support,
