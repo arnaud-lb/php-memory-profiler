@@ -52,22 +52,21 @@ if test "$PHP_MEMPROF" != "no"; then
   PHP_SUBST(MEMPROF_SHARED_LIBADD)
 
   AC_MSG_CHECKING(for malloc hooks)
-  AC_TRY_COMPILE([
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     #include <malloc.h>
     extern void * malloc_hook(size_t size, const void *caller);
     extern void * realloc_hook(void *ptr, size_t size, const void *caller);
     extern void free_hook(void *ptr, const void *caller);
     extern void * memalign_hook(size_t alignment, size_t size, const void *caller);
-  ],
-  [
+  ]], [[
     __malloc_hook = malloc_hook;
     __free_hook = free_hook;
     __realloc_hook = realloc_hook;
     __memalign_hook = memalign_hook;
-  ],[
+  ]])],[
     AC_DEFINE([HAVE_MALLOC_HOOKS], 1, [Define to 1 if libc supports malloc hooks])
     AC_MSG_RESULT(yes)
-  ], [
+  ],[
     AC_MSG_RESULT(no)
   ])
 
