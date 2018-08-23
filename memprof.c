@@ -32,10 +32,6 @@
 #endif
 #include <assert.h>
 
-#ifdef ZTS
-	/* TODO: support ZTS builds (without malloc hooks) */
-#	error "ZTS build not supported (yet)"
-#endif
 
 #if MEMPROF_CONFIGURE_VERSION != 3
 #	error Please rebuild configure (run phpize and reconfigure)
@@ -360,7 +356,7 @@ static frame * new_frame(frame * prev, char * name, size_t name_len)
 	return f;
 }
 
-static frame * get_or_create_frame(zend_execute_data * current_execute_data, frame * prev)
+static frame * get_or_create_frame(zend_execute_data * current_execute_data, frame * prev TSRMLS_DC)
 {
 	frame * f;
 	frame ** f_pp;
@@ -368,7 +364,7 @@ static frame * get_or_create_frame(zend_execute_data * current_execute_data, fra
 	char name[256];
 	size_t name_len;
 
-	name_len = get_function_name(current_execute_data, name, sizeof(name));
+	name_len = get_function_name(current_execute_data, name, sizeof(name) TSRMLS_CC);
 
 	if (SUCCESS == zend_hash_find(&prev->next_cache, name, name_len+1, (void**) &f_pp)) {
 		f = *f_pp;
@@ -645,7 +641,7 @@ static void memprof_zend_execute(zend_execute_data *execute_data TSRMLS_DC)
 {
 	WITHOUT_MALLOC_TRACKING {
 
-		current_frame = get_or_create_frame(EG(current_execute_data), current_frame);
+		current_frame = get_or_create_frame(EG(current_execute_data), current_frame TSRMLS_CC);
 		current_frame->calls++;
 		current_alloc_list = &current_frame->allocs;
 
@@ -683,7 +679,7 @@ static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, z
 	WITHOUT_MALLOC_TRACKING {
 
 		if (!ignore) {
-			current_frame = get_or_create_frame(execute_data_ptr, current_frame);
+			current_frame = get_or_create_frame(execute_data_ptr, current_frame TSRMLS_CC);
 			current_frame->calls++;
 			current_alloc_list = &current_frame->allocs;
 		}
@@ -698,9 +694,9 @@ static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, z
 	}
 #else
 	if (!old_zend_execute_internal) {
-		execute_internal(execute_data_ptr, fci, return_value_used);
+		execute_internal(execute_data_ptr, fci, return_value_used TSRMLS_CC);
 	} else {
-		old_zend_execute_internal(execute_data_ptr, fci, return_value_used);
+		old_zend_execute_internal(execute_data_ptr, fci, return_value_used TSRMLS_CC);
 	}
 #endif
 
@@ -721,15 +717,15 @@ static PHP_INI_MH(OnChangeMemoryLimit)
 	ret = origOnChangeMemoryLimit(entry, new_value, new_value_length, mh_arg1, mh_arg2, mh_arg3, stage TSRMLS_CC);
 
 	if (memprof_enabled) {
-		zend_mm_set_heap(orig_zheap);
+		zend_mm_set_heap(orig_zheap TSRMLS_CC);
 		ret = zend_set_memory_limit(PG(memory_limit));
-		zend_mm_set_heap(zheap);
+		zend_mm_set_heap(zheap TSRMLS_CC);
 	}
 
 	return ret;
 }
 
-static void memprof_enable()
+static void memprof_enable(TSRMLS_D)
 {
 	alloc_buckets_init(&current_alloc_buckets);
 
@@ -741,14 +737,14 @@ static void memprof_enable()
 
 	memprof_enabled = 1;
 
-	if (is_zend_mm()) {
+	if (is_zend_mm(TSRMLS_C)) {
 		/* There is no way to completely free a zend_mm_heap with custom
-		 * handlers, so we have to allocate it ourselves. We don't know the
+		 * handlers, so we have to allocated it ourselves. We don't know the
 		 * actual size of a _zend_mm_heap struct, but this should be enough. */
 		zheap = malloc(zend_mm_heap_size);
 		memset(zheap, 0, zend_mm_heap_size);
 		zend_mm_set_custom_handlers(zheap, zend_malloc_handler, zend_free_handler, zend_realloc_handler);
-		orig_zheap = zend_mm_set_heap(zheap);
+		orig_zheap = zend_mm_set_heap(zheap TSRMLS_CC);
 	} else {
 		zheap = NULL;
 		orig_zheap = NULL;
@@ -762,7 +758,7 @@ static void memprof_enable()
 	track_mallocs = 1;
 }
 
-static void memprof_disable()
+static void memprof_disable(TSRMLS_D)
 {
 	track_mallocs = 0;
 
@@ -770,7 +766,7 @@ static void memprof_disable()
 	zend_execute_internal = old_zend_execute_internal;
 
 	if (zheap) {
-		zend_mm_set_heap(orig_zheap);
+		zend_mm_set_heap(orig_zheap TSRMLS_CC);
 		free(zheap);
 	}
 
@@ -896,7 +892,7 @@ PHP_MINIT_FUNCTION(memprof)
 		size_t name_len = strlen(fentry->fname);
 		zend_hash_del(CG(function_table), fentry->fname, name_len+1);
 	}
-	zend_register_functions(NULL, memprof_function_overrides, NULL, type);
+	zend_register_functions(NULL, memprof_function_overrides, NULL, type TSRMLS_CC);
 
 	return SUCCESS;
 }
@@ -922,7 +918,7 @@ PHP_MSHUTDOWN_FUNCTION(memprof)
 PHP_RSHUTDOWN_FUNCTION(memprof)
 {
 	if (memprof_enabled) {
-		memprof_disable();
+		memprof_disable(TSRMLS_C);
 	}
 
 	return SUCCESS;
@@ -1032,7 +1028,7 @@ static void dump_frame_array(zval * dest, frame * f)
 	}
 }
 
-static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, size_t * inclusive_size, size_t * inclusive_count)
+static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, size_t * inclusive_size, size_t * inclusive_count TSRMLS_DC)
 {
 	size_t size = 0;
 	size_t count = 0;
@@ -1054,7 +1050,7 @@ static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, s
 			continue;
 		}
 
-		dump_frame_callgrind(stream, *next_pp, str_key, &call_size, &call_count);
+		dump_frame_callgrind(stream, *next_pp, str_key, &call_size, &call_count TSRMLS_CC);
 
 		size += call_size;
 		count += call_count;
@@ -1062,8 +1058,8 @@ static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, s
 		zend_hash_move_forward_ex(&f->next_cache, &pos);
 	}
 
-	stream_printf(stream, "fl=/todo.php\n");
-	stream_printf(stream, "fn=%s\n", fname);
+	stream_printf(stream, "fl=/todo.php\n" TSRMLS_CC);
+	stream_printf(stream, "fn=%s\n" TSRMLS_CC, fname);
 
 	LIST_FOREACH(alloc, &f->allocs, list) {
 		self_size += alloc->size;
@@ -1072,7 +1068,7 @@ static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, s
 	size += self_size;
 	count += self_count;
 
-	stream_printf(stream, "1 %zu %zu\n", self_size, self_count);
+	stream_printf(stream, "1 %zu %zu\n" TSRMLS_CC, self_size, self_count);
 
 	zend_hash_internal_pointer_reset_ex(&f->next_cache, &pos);
 	while (zend_hash_get_current_data_ex(&f->next_cache, (void **)&next_pp, &pos) == SUCCESS) {
@@ -1088,15 +1084,15 @@ static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, s
 
 		frame_inclusive_cost(*next_pp, &call_size, &call_count);
 
-		stream_printf(stream, "cfl=/todo.php\n");
-		stream_printf(stream, "cfn=%s\n", str_key);
-		stream_printf(stream, "calls=%zu 1\n", (*next_pp)->calls);
-		stream_printf(stream, "1 %zu %zu\n", call_size, call_count);
+		stream_printf(stream, "cfl=/todo.php\n" TSRMLS_CC);
+		stream_printf(stream, "cfn=%s\n" TSRMLS_CC, str_key);
+		stream_printf(stream, "calls=%zu 1\n" TSRMLS_CC, (*next_pp)->calls);
+		stream_printf(stream, "1 %zu %zu\n" TSRMLS_CC, call_size, call_count);
 
 		zend_hash_move_forward_ex(&f->next_cache, &pos);
 	}
 
-	stream_printf(stream, "\n");
+	stream_printf(stream, "\n" TSRMLS_CC);
 
 	if (inclusive_size) {
 		*inclusive_size = size;
@@ -1106,7 +1102,7 @@ static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, s
 	}
 }
 
-static void dump_frames_pprof(php_stream * stream, HashTable * symbols, frame * f)
+static void dump_frames_pprof(php_stream * stream, HashTable * symbols, frame * f TSRMLS_DC)
 {
 	HashPosition pos;
 	frame * prev;
@@ -1115,8 +1111,8 @@ static void dump_frames_pprof(php_stream * stream, HashTable * symbols, frame * 
 	size_t stack_depth = frame_stack_depth(f);
 
 	if (0 < size) {
-		stream_write_word(stream, size);
-		stream_write_word(stream, stack_depth);
+		stream_write_word(stream, size TSRMLS_CC);
+		stream_write_word(stream, stack_depth TSRMLS_CC);
 
 		for (prev = f; prev; prev = prev->prev) {
 			zend_uintptr_t * symaddr_p;
@@ -1125,7 +1121,7 @@ static void dump_frames_pprof(php_stream * stream, HashTable * symbols, frame * 
 				zend_error(E_CORE_ERROR, "symbol address not found");
 				return;
 			}
-			stream_write_word(stream, *symaddr_p);
+			stream_write_word(stream, *symaddr_p TSRMLS_CC);
 		}
 	}
 
@@ -1139,13 +1135,13 @@ static void dump_frames_pprof(php_stream * stream, HashTable * symbols, frame * 
 			continue;
 		}
 
-		dump_frames_pprof(stream, symbols, *next_pp);
+		dump_frames_pprof(stream, symbols, *next_pp TSRMLS_CC);
 
 		zend_hash_move_forward_ex(&f->next_cache, &pos);
 	}
 }
 
-static void dump_frames_pprof_symbols(php_stream * stream, HashTable * symbols, frame * f)
+static void dump_frames_pprof_symbols(php_stream * stream, HashTable * symbols, frame * f TSRMLS_DC)
 {
 	HashPosition pos;
 	frame ** next_pp;
@@ -1155,7 +1151,7 @@ static void dump_frames_pprof_symbols(php_stream * stream, HashTable * symbols, 
 		/* addr only has to be unique */
 		symaddr = (symbols->nNumOfElements+1)<<3;
 		zend_hash_add(symbols, f->name, f->name_len+1, &symaddr, sizeof(symaddr), NULL);
-		stream_printf(stream, "0x%0*x %s\n", sizeof(symaddr)*2, symaddr, f->name);
+		stream_printf(stream, "0x%0*x %s\n" TSRMLS_CC, sizeof(symaddr)*2, symaddr, f->name);
 	}
 
 	zend_hash_internal_pointer_reset_ex(&f->next_cache, &pos);
@@ -1168,7 +1164,7 @@ static void dump_frames_pprof_symbols(php_stream * stream, HashTable * symbols, 
 			continue;
 		}
 
-		dump_frames_pprof_symbols(stream, symbols, *next_pp);
+		dump_frames_pprof_symbols(stream, symbols, *next_pp TSRMLS_CC);
 
 		zend_hash_move_forward_ex(&f->next_cache, &pos);
 	}
@@ -1217,15 +1213,15 @@ PHP_FUNCTION(memprof_dump_callgrind)
 
 	WITHOUT_MALLOC_TRACKING {
 
-		stream_printf(stream, "version: 1\n");
-		stream_printf(stream, "cmd: unknown\n");
-		stream_printf(stream, "positions: line\n");
-		stream_printf(stream, "events: MemorySize BlocksCount\n");
-		stream_printf(stream, "\n");
+		stream_printf(stream, "version: 1\n" TSRMLS_CC);
+		stream_printf(stream, "cmd: unknown\n" TSRMLS_CC);
+		stream_printf(stream, "positions: line\n" TSRMLS_CC);
+		stream_printf(stream, "events: MemorySize BlocksCount\n" TSRMLS_CC);
+		stream_printf(stream, "\n" TSRMLS_CC);
 
-		dump_frame_callgrind(stream, &default_frame, "root", &total_size, &total_count);
+		dump_frame_callgrind(stream, &default_frame, "root", &total_size, &total_count TSRMLS_CC);
 
-		stream_printf(stream, "total: %zu %zu\n", total_size, total_count);
+		stream_printf(stream, "total: %zu %zu\n" TSRMLS_CC, total_size, total_count);
 
 	} END_WITHOUT_MALLOC_TRACKING;
 }
@@ -1256,26 +1252,26 @@ PHP_FUNCTION(memprof_dump_pprof)
 
 		/* symbols */
 
-		stream_printf(stream, "--- symbol\n");
-		stream_printf(stream, "binary=todo.php\n");
-		dump_frames_pprof_symbols(stream, &symbols, &default_frame);
-		stream_printf(stream, "---\n");
-		stream_printf(stream, "--- profile\n");
+		stream_printf(stream, "--- symbol\n" TSRMLS_CC);
+		stream_printf(stream, "binary=todo.php\n" TSRMLS_CC);
+		dump_frames_pprof_symbols(stream, &symbols, &default_frame TSRMLS_CC);
+		stream_printf(stream, "---\n" TSRMLS_CC);
+		stream_printf(stream, "--- profile\n" TSRMLS_CC);
 
 		/* profile header */
 
 		/* header count */
-		stream_write_word(stream, 0);
+		stream_write_word(stream, 0 TSRMLS_CC);
 		/* header words after this one */
-		stream_write_word(stream, 3);
+		stream_write_word(stream, 3 TSRMLS_CC);
 		/* format version */
-		stream_write_word(stream, 0);
+		stream_write_word(stream, 0 TSRMLS_CC);
 		/* sampling period */
-		stream_write_word(stream, 0);
+		stream_write_word(stream, 0 TSRMLS_CC);
 		/* unused padding */
-		stream_write_word(stream, 0);
+		stream_write_word(stream, 0 TSRMLS_CC);
 
-		dump_frames_pprof(stream, &symbols, &default_frame);
+		dump_frames_pprof(stream, &symbols, &default_frame TSRMLS_CC);
 
 		zend_hash_destroy(&symbols);
 
@@ -1294,11 +1290,11 @@ PHP_FUNCTION(memprof_memory_get_usage)
 	}
 
 	if (memprof_enabled && orig_zheap) {
-		zend_mm_set_heap(orig_zheap);
-		RETVAL_LONG(zend_memory_usage(real));
-		zend_mm_set_heap(zheap);
+		zend_mm_set_heap(orig_zheap TSRMLS_CC);
+		RETVAL_LONG(zend_memory_usage(real TSRMLS_CC));
+		zend_mm_set_heap(zheap TSRMLS_CC);
 	} else {
-		RETVAL_LONG(zend_memory_usage(real));
+		RETVAL_LONG(zend_memory_usage(real TSRMLS_CC));
 	}
 }
 /* }}} */
@@ -1314,11 +1310,11 @@ PHP_FUNCTION(memprof_memory_get_peak_usage)
 	}
 
 	if (memprof_enabled && orig_zheap) {
-		zend_mm_set_heap(orig_zheap);
-		RETVAL_LONG(zend_memory_peak_usage(real));
-		zend_mm_set_heap(zheap);
+		zend_mm_set_heap(orig_zheap TSRMLS_CC);
+		RETVAL_LONG(zend_memory_peak_usage(real TSRMLS_CC));
+		zend_mm_set_heap(zheap TSRMLS_CC);
 	} else {
-		RETVAL_LONG(zend_memory_peak_usage(real));
+		RETVAL_LONG(zend_memory_peak_usage(real TSRMLS_CC));
 	}
 }
 /* }}} */
@@ -1336,7 +1332,7 @@ PHP_FUNCTION(memprof_enable)
 		return;
 	}
 
-	memprof_enable();
+	memprof_enable(TSRMLS_C);
 
 	RETURN_TRUE;
 }
@@ -1355,7 +1351,7 @@ PHP_FUNCTION(memprof_disable)
 		return;
 	}
 
-	memprof_disable();
+	memprof_disable(TSRMLS_C);
 
 	RETURN_TRUE;
 }
