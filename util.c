@@ -15,7 +15,7 @@
 #include "php.h"
 #include <stdarg.h>
 
-void stream_printf(php_stream * stream, const char * format, TSRMLS_D, ...)
+void stream_printf(php_stream * stream, const char * format TSRMLS_DC, ...)
 {
 	char * buf;
 	va_list ap;
