@@ -1,14 +1,19 @@
 # Memprof internals
 
-Memprof counts memory blocks allocated by PHP functions. It does so by hooking
-in memory allocation functions, and linking newly allocated blocks to the
-currently called function.
+Memprof tracks the amount of memory allocated by PHP functions. It does so by hooking
+in the memory allocator in order to keep track of which function allocated a block.
 
-## Call frames
+## Data structures
 
-In order to link allocations with function calls, we maintain a tree
-of structures representing current and past function calls. We call them
-*frames*, and they are defined as follows:
+Three main structures allow to track the memory of the program:
+
+- `frame`: Allocation informations about one particular call path.
+- `allocs_set`: As the name doesn't suggest, this is a map from memory addresses to informations about one particular allocation.
+- `alloc`: A struct representing one particular allocation. It's a linked list item.
+
+### Call frames
+
+We want to know how much memory was allocated by each call stacks. This structure represents exactly this information:
 
     /* a call frame */
     typedef struct _frame {
@@ -20,76 +25,17 @@ of structures representing current and past function calls. We call them
         alloc_list_head allocs; /* head of the allocations list */
     } frame;
 
-Every time a function is called, we look in ``next_cache`` to see if that
-function has already been called from the current function call path. If
-so, we just increment its number of calls. Else, we create a new frame.
+Every time a function is called, we create a new `frame` struct, unless one already exists for this call path (we use `next_cache` to find existing `frame` structs).
 
-A pointer to the frame is stored in the ``current_frame`` variable.
+The frame contains a linked list of allocation informations (a list of `alloc` structs). This is a doubly linked list to make it possible to remove one item without knowing the related frame or list head.
 
-When the function returns, ``current_frame`` is pointed back to the parent of
-the current frame.
+### Allocation map
 
-The result is a tree representing unique function call pathes, and allocation
-informations about each function call path.
+We want to forget about allocated blocks when they are freed. The `allocs_set` struct is a map from memory addresses to `alloc` structs. It makes it easy and fast to find the `alloc` struct related to a memory address being freed, and to remove this struct from its doubly linked list (whose list head or related framne we don't need to know).
 
-## Allocation lists
+### Allocating allocation information
 
-Informations about each allocation is stored in an ``_alloc`` struct,
-defined as follows:
-
-    /* an allocated block's infos */
-    typedef struct _alloc {
-        LIST_ENTRY(_alloc) list;    /* LIST_ENTRY (from sys/queue.h) declares
-                                       the pointers required to form a
-                                       doubly-linked list */
-        size_t size;                /* size of the allocation */
-    } alloc;
-
-When an allocation is made, we also allocate an ``_alloc`` struct, and link
-it in the current frame's ``alloc`` list.
-
-Now it's very easy to dump memory allocation informations. To find the amount
-of memory allocated by some function we just have to sum the sizes from the
-allocations list of the corresponding frame. For instance,
-``memprof_dump_array()`` does this for every function call path by traversing
-the ``_frame`` tree from the root.
-
-You may be wondering why not just increment a *"memory_allocated"* counter
-on the ``_frame`` struct; the reason for the ``_alloc`` list is that it enables
-taking de-allocations into account, even after the allocating function
-has returned:
-
-A pointer to the block is also stored in a global key-value structure
-(named ``allocs_set``) mapping memory addresses to ``_alloc`` structs. When
-a de-allocation is done, we can find the relevant ``_alloc`` struct, and
-remove it from the list it is linked to. Thanks to the doubly linked list,
-we don't even have to find the function that allocated it. That being done,
-if we output the amount of memory allocated by the function which allocated
-this block, the block is not in the list anymore and will not be counted.
-
-## Allocating allocation informations
-
-Allocating the ``_alloc`` structs is made pretty much overhead-less by using
-a specialized memory pool. Allocations are fixed size, allowing the pool to
-be very simple, and to have close to zero CPU and memory overhead.
-
-The pool basically allocates a large memory area, divides it into blocks the
-size of an ``_alloc`` struct, and links every free blocks together. Allocating
-an ``_alloc`` struct is just a matter of unlinking the block at the head of
-the queue. Freeing it re-links the block.
-
-Initial memprof implementation stored the ``_alloc`` struct at the begining of
-allocated memory blocks by allocating a little more memory (e.g. calling the
-actual malloc function with ``sizeof(struct _alloc)+size+alignment``, and
-returning a safely aligned address pointing past the ``_alloc`` struct). This
-worked well, however this made the entire process dependent on memprof,
-once memprof had been enabled: every single de-allocation had to go through
-memprof hooks, so that the right address was passed to the actuall ``free``
-function, else ``free`` would see wrong addresses. This could have been fixed
-by moving the ``_alloc`` struct at the end of the blocks, however this also
-required to store the size of the block externally, which is basically what
-we do now, with more complexity. Current implementation allows to disable or
-even unload the memprof extension a anytime.
+In order to reduce the overhead of creating `alloc` structs to the minimum, we use a memory pool to allocate and recycle them.
 
 ## Hooking in ``malloc``
 
@@ -97,7 +43,7 @@ The GNU C library makes this very simple by [allowing it
 explicitly](https://www.gnu.org/software/libc/manual/html_node/Hooks-for-Malloc.html#Hooks-for-Malloc).
 
 These hooks are not thread safe, and are deprecated for this reason, however
-this doesn't have an impact on non-ZTS PHP builds.
+this doesn't have an impact on non-ZTS PHP builds (unless an extension or library creates threads internally).
 
 Hooking in ``malloc`` calls allow to track persistent allocations made by
 PHP (i.e. allocations that should persist after script execution and are
