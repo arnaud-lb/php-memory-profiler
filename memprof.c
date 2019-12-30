@@ -633,7 +633,7 @@ static void memprof_zend_execute(zend_execute_data *execute_data TSRMLS_DC)
 {
 	WITHOUT_MALLOC_TRACKING {
 
-		current_frame = get_or_create_frame(EG(current_execute_data), current_frame);
+		current_frame = get_or_create_frame(execute_data, current_frame);
 		current_frame->calls++;
 		current_alloc_list = &current_frame->allocs;
 
