@@ -629,7 +629,7 @@ static void * zend_realloc_handler(void * ptr, size_t size)
 	return result;
 }
 
-static void memprof_zend_execute(zend_execute_data *execute_data TSRMLS_DC)
+static void memprof_zend_execute(zend_execute_data *execute_data)
 {
 	WITHOUT_MALLOC_TRACKING {
 
@@ -639,7 +639,7 @@ static void memprof_zend_execute(zend_execute_data *execute_data TSRMLS_DC)
 
 	} END_WITHOUT_MALLOC_TRACKING;
 
-	old_zend_execute(execute_data TSRMLS_CC);
+	old_zend_execute(execute_data);
 
 	if (memprof_enabled) {
 		current_frame = current_frame->prev;
@@ -1158,12 +1158,12 @@ static void dump_frames_pprof_symbols(php_stream * stream, HashTable * symbols, 
    Returns current memory usage as an array */
 PHP_FUNCTION(memprof_dump_array)
 {
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "") == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "") == FAILURE) {
 		return;
 	}
 
 	if (!memprof_enabled) {
-		zend_throw_exception(EG(exception_class), "memprof is not enabled", 0 TSRMLS_CC);
+		zend_throw_exception(EG(exception_class), "memprof is not enabled", 0);
 		return;
 	}
 
@@ -1184,12 +1184,12 @@ PHP_FUNCTION(memprof_dump_callgrind)
 	size_t total_size;
 	size_t total_count;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &arg1) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &arg1) == FAILURE) {
 		return;
 	}
 
 	if (!memprof_enabled) {
-		zend_throw_exception(EG(exception_class), "memprof is not enabled", 0 TSRMLS_CC);
+		zend_throw_exception(EG(exception_class), "memprof is not enabled", 0);
 		return;
 	}
 
@@ -1219,12 +1219,12 @@ PHP_FUNCTION(memprof_dump_pprof)
 	php_stream *stream;
 	HashTable symbols;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &arg1) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &arg1) == FAILURE) {
 		return;
 	}
 
 	if (!memprof_enabled) {
-		zend_throw_exception(EG(exception_class), "memprof is not enabled", 0 TSRMLS_CC);
+		zend_throw_exception(EG(exception_class), "memprof is not enabled", 0);
 		return;
 	}
 
@@ -1269,7 +1269,7 @@ PHP_FUNCTION(memprof_memory_get_usage)
 {
 	zend_bool real = 0;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|b", &real) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "|b", &real) == FAILURE) {
 		return;
 	}
 
@@ -1289,7 +1289,7 @@ PHP_FUNCTION(memprof_memory_get_peak_usage)
 {
 	zend_bool real = 0;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|b", &real) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "|b", &real) == FAILURE) {
 		return;
 	}
 
@@ -1307,12 +1307,12 @@ PHP_FUNCTION(memprof_memory_get_peak_usage)
    Enables memprof */
 PHP_FUNCTION(memprof_enable)
 {
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "") == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "") == FAILURE) {
 		return;
 	}
 
 	if (memprof_enabled) {
-		zend_throw_exception(EG(exception_class), "memprof is already enabled", 0 TSRMLS_CC);
+		zend_throw_exception(EG(exception_class), "memprof is already enabled", 0);
 		return;
 	}
 
@@ -1326,12 +1326,12 @@ PHP_FUNCTION(memprof_enable)
    Disables memprof */
 PHP_FUNCTION(memprof_disable)
 {
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "") == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "") == FAILURE) {
 		return;
 	}
 
 	if (!memprof_enabled) {
-		zend_throw_exception(EG(exception_class), "memprof is not enabled", 0 TSRMLS_CC);
+		zend_throw_exception(EG(exception_class), "memprof is not enabled", 0);
 		return;
 	}
 
@@ -1345,7 +1345,7 @@ PHP_FUNCTION(memprof_disable)
    Returns whether memprof is enabled */
 PHP_FUNCTION(memprof_enabled)
 {
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "") == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "") == FAILURE) {
 		return;
 	}
 
