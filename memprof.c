@@ -979,14 +979,14 @@ static void dump_frame_array(zval * dest, frame * f)
 		alloc_count ++;
 	}
 
-	add_assoc_long_ex(zframe, ZEND_STRS("memory_size"), alloc_size);
-	add_assoc_long_ex(zframe, ZEND_STRS("blocks_count"), alloc_count);
+	add_assoc_long_ex(zframe, ZEND_STRL("memory_size"), alloc_size);
+	add_assoc_long_ex(zframe, ZEND_STRL("blocks_count"), alloc_count);
 
 	frame_inclusive_cost(f, &inclusive_size, &inclusive_count);
-	add_assoc_long_ex(zframe, ZEND_STRS("memory_size_inclusive"), inclusive_size);
-	add_assoc_long_ex(zframe, ZEND_STRS("blocks_count_inclusive"), inclusive_count);
+	add_assoc_long_ex(zframe, ZEND_STRL("memory_size_inclusive"), inclusive_size);
+	add_assoc_long_ex(zframe, ZEND_STRL("blocks_count_inclusive"), inclusive_count);
 
-	add_assoc_long_ex(zframe, ZEND_STRS("calls"), f->calls);
+	add_assoc_long_ex(zframe, ZEND_STRL("calls"), f->calls);
 
 	array_init(&zcalled_functions);
 
@@ -1008,7 +1008,7 @@ static void dump_frame_array(zval * dest, frame * f)
 		zend_hash_move_forward_ex(&f->next_cache, &pos);
 	}
 
-	add_assoc_zval_ex(zframe, ZEND_STRS("called_functions"), &zcalled_functions);
+	add_assoc_zval_ex(zframe, ZEND_STRL("called_functions"), &zcalled_functions);
 }
 
 static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, size_t * inclusive_size, size_t * inclusive_count)
