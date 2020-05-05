@@ -60,7 +60,7 @@ size_t get_function_name(zend_execute_data * execute_data, char * buf, size_t bu
 
 	if (zname == NULL) {
 		zend_execute_data * include_execute_data = execute_data;
-		if (include_execute_data->opline->opcode != ZEND_INCLUDE_OR_EVAL && include_execute_data->prev_execute_data != NULL && include_execute_data->prev_execute_data->opline->opcode == ZEND_INCLUDE_OR_EVAL) {
+		if (!include_execute_data->opline || include_execute_data->opline->opcode != ZEND_INCLUDE_OR_EVAL && include_execute_data->prev_execute_data != NULL && include_execute_data->prev_execute_data->opline->opcode == ZEND_INCLUDE_OR_EVAL) {
 			include_execute_data = execute_data->prev_execute_data;
 		}
 		switch (include_execute_data->opline->extended_value) {
