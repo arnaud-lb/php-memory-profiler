@@ -765,6 +765,71 @@ static void memprof_disable()
 	allocs_set = (Pvoid_t) NULL;
 }
 
+static void disable_opcache()
+{
+	zend_string *key = zend_string_init(ZEND_STRL("opcache.enable"), 0);
+	zend_alter_ini_entry_chars_ex(
+		key,
+		"0",
+		1,
+		ZEND_INI_USER,
+		ZEND_INI_STAGE_ACTIVATE,
+		0
+	);
+	zend_string_release(key);
+}
+
+static zend_string* read_env_get_post(char *name, size_t len)
+{
+	zval *value;
+
+	char *env = sapi_getenv(name, len);
+	if (env != NULL) {
+		zend_string *str = zend_string_init(env, strlen(env), 0);
+		efree(env);
+		return str;
+	}
+
+	env = getenv(name);
+	if (env != NULL) {
+		return zend_string_init(env, strlen(env), 0);
+	}
+
+	if (Z_ARR(PG(http_globals)[TRACK_VARS_GET]) != NULL) {
+		value = zend_hash_str_find(Z_ARR(PG(http_globals)[TRACK_VARS_GET]), name, len);
+		if (value != NULL) {
+			convert_to_string_ex(value);
+			zend_string_addref(Z_STR_P(value));
+			return Z_STR_P(value);
+		}
+	}
+
+	if (Z_ARR(PG(http_globals)[TRACK_VARS_POST]) != NULL) {
+		value = zend_hash_str_find(Z_ARR(PG(http_globals)[TRACK_VARS_POST]), name, len);
+		if (value != NULL) {
+			convert_to_string_ex(value);
+			zend_string_addref(Z_STR_P(value));
+			return Z_STR_P(value);
+		}
+	}
+
+	return NULL;
+}
+
+static int should_autostart()
+{
+	zend_string *value = read_env_get_post(MEMPROF_ENV_PROFILE, strlen(MEMPROF_ENV_PROFILE));
+	if (value == NULL) {
+		return 0;
+	}
+
+	int autostart = ZSTR_LEN(value) > 0;
+
+	zend_string_release(value);
+
+	return autostart;
+}
+
 ZEND_DLEXPORT int memprof_zend_startup(zend_extension *extension)
 {
 	return zend_startup_module(&memprof_module_entry);
@@ -842,7 +907,7 @@ zend_module_entry memprof_module_entry = {
 	memprof_functions,
 	PHP_MINIT(memprof),
 	PHP_MSHUTDOWN(memprof),
-	NULL,
+	PHP_RINIT(memprof),
 	PHP_RSHUTDOWN(memprof),
 	PHP_MINFO(memprof),
 #if ZEND_MODULE_API_NO >= 20010901
@@ -895,6 +960,19 @@ PHP_MSHUTDOWN_FUNCTION(memprof)
 		if (entry != NULL) {
 			entry->on_modify = origOnChangeMemoryLimit;
 		}
+	}
+
+	return SUCCESS;
+}
+/* }}} */
+
+/* {{{ PHP_RINIT_FUNCTION
+ */
+PHP_RINIT_FUNCTION(memprof)
+{
+	if (should_autostart()) {
+		disable_opcache();
+		memprof_enable();
 	}
 
 	return SUCCESS;
@@ -1318,6 +1396,8 @@ PHP_FUNCTION(memprof_enable)
 		zend_throw_exception(EG(exception_class), "memprof is already enabled", 0);
 		return;
 	}
+
+	zend_error(E_WARNING, "Calling memprof_enable() manually may not work as expected because of PHP optimizations. Prefer using MEMPROF_PROFILE=1 as environment variable, GET, or POST");
 
 	memprof_enable();
 
