@@ -189,6 +189,7 @@ static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, zv
 static PHP_INI_MH((*origOnChangeMemoryLimit)) = NULL;
 
 static int memprof_enabled = 0;
+static int memprof_dumped = 0;
 static int track_mallocs = 0;
 
 static frame default_frame;
@@ -719,6 +720,7 @@ static void memprof_enable()
 	MALLOC_HOOK_SET_OWN();
 
 	memprof_enabled = 1;
+	memprof_dumped = 0;
 
 	if (is_zend_mm()) {
 		/* There is no way to completely free a zend_mm_heap with custom
@@ -763,6 +765,10 @@ static void memprof_disable()
 
 	JudyLFreeArray(&allocs_set, PJE0);
 	allocs_set = (Pvoid_t) NULL;
+
+	if (!memprof_dumped) {
+		zend_error(E_WARNING, "Memprof profiling was enabled, but no profile was dumped. Did you forget to call one of memprof_dump_callgrind(), memprof_dump_pprof(), or memprof_dump_array() ?");
+	}
 }
 
 static void disable_opcache()
@@ -1244,7 +1250,7 @@ PHP_FUNCTION(memprof_dump_array)
 	}
 
 	if (!memprof_enabled) {
-		zend_throw_exception(EG(exception_class), "memprof is not enabled", 0);
+		zend_throw_exception(EG(exception_class), "memprof_dump_array(): memprof is not enabled", 0);
 		return;
 	}
 
@@ -1253,6 +1259,8 @@ PHP_FUNCTION(memprof_dump_array)
 		dump_frame_array(return_value, &default_frame);
 
 	} END_WITHOUT_MALLOC_TRACKING;
+
+	memprof_dumped = 1;
 }
 /* }}} */
 
@@ -1270,7 +1278,7 @@ PHP_FUNCTION(memprof_dump_callgrind)
 	}
 
 	if (!memprof_enabled) {
-		zend_throw_exception(EG(exception_class), "memprof is not enabled", 0);
+		zend_throw_exception(EG(exception_class), "memprof_dump_callgrind(): memprof is not enabled", 0);
 		return;
 	}
 
@@ -1289,6 +1297,8 @@ PHP_FUNCTION(memprof_dump_callgrind)
 		stream_printf(stream, "total: %zu %zu\n", total_size, total_count);
 
 	} END_WITHOUT_MALLOC_TRACKING;
+
+	memprof_dumped = 1;
 }
 /* }}} */
 
@@ -1305,7 +1315,7 @@ PHP_FUNCTION(memprof_dump_pprof)
 	}
 
 	if (!memprof_enabled) {
-		zend_throw_exception(EG(exception_class), "memprof is not enabled", 0);
+		zend_throw_exception(EG(exception_class), "memprof_dump_pprof(): memprof is not enabled", 0);
 		return;
 	}
 
@@ -1341,6 +1351,8 @@ PHP_FUNCTION(memprof_dump_pprof)
 		zend_hash_destroy(&symbols);
 
 	} END_WITHOUT_MALLOC_TRACKING;
+
+	memprof_dumped = 1;
 }
 /* }}} */
 
@@ -1393,7 +1405,7 @@ PHP_FUNCTION(memprof_enable)
 	}
 
 	if (memprof_enabled) {
-		zend_throw_exception(EG(exception_class), "memprof is already enabled", 0);
+		zend_throw_exception(EG(exception_class), "memprof_enable(): memprof is already enabled", 0);
 		return;
 	}
 
@@ -1414,7 +1426,7 @@ PHP_FUNCTION(memprof_disable)
 	}
 
 	if (!memprof_enabled) {
-		zend_throw_exception(EG(exception_class), "memprof is not enabled", 0);
+		zend_throw_exception(EG(exception_class), "memprof_disable(): memprof is not enabled", 0);
 		return;
 	}
 
