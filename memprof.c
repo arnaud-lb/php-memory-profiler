@@ -32,6 +32,8 @@
 #endif
 #include <assert.h>
 
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 #ifdef ZTS
 	/* TODO: support ZTS builds (without malloc hooks) */
 #	error "ZTS build not supported (yet)"
