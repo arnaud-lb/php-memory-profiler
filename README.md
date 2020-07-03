@@ -82,7 +82,7 @@ This can be done multiple times during the same execution, if necessary.
 ### 3. Visualizing the profile
 
 The profile can be visualised with Kcachegrind, Qcachegrind, Google Perftools,
-or with custom tools. See the documentation of ``the memprof_dump_callgrind()``
+or with custom tools. See the documentation of ``memprof_dump_callgrind()``
 and variants.
 
 ### Usage example
