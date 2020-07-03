@@ -1,71 +1,28 @@
 # php-memprof
 
-![Supported PHP versions: 7.x](https://img.shields.io/badge/php-7.x-blue.svg)
+![Supported PHP versions: 7.0 ... 8.x](https://img.shields.io/badge/php-7.0%20...%208.x-blue.svg)
 
-php-memprof profiles memory usage of PHP scripts, and especially can tell which
-function has allocated every single byte of memory currently allocated.
-
-This is different from measuring the memory usage before and after a
-function call:
-
-``` php
-<?php
-
-// script 1
-
-function a() {
-    $data = file_get_contents("huge-file");
-}
-
-a();
-
-$profile = memprof_dump_array();
-
-```
-
-In script 1, a before/after approach would designate file_get_contents() as huge
-memory consumer, while the memory it allocates is actually freed quickly after
-it returns. When dumping the memory usage after a() returns, the memprof
-approach would show that file_get_contents() is a small memory consumer since
-the memory it allocated has been freed at the time memprof_dump_array() is
-called.
-
-
-``` php
-<?php
-
-// script 2
-
-function a() {
-    global $cache;
-    $cache = file_get_contents("huge-file");
-}
-
-a();
-
-$profile = memprof_dump_array();
-```
-
-In script 2, the allocated memory remains allocated after file_get_contents()
-and a() return, and when memprof_dump_array() is called. This time a() and
-file_get_contents() are shown as huge memory consumers.
-
-## How it works
-
-See [INTERNALS.md][7]
-
-## Dependencies
-
- * [Judy Library][3] (e.g. libjudy-dev or judy package)
- * C Library with [malloc hooks][1] (optional; allows to track persistent allocations too)
+php-memprof is a memory profiler for PHP that can be used to detect memory leaks.
 
 ## Install
 
+### Dependencies
+
+php-memprof depends on libjudy. On Debian or Ubuntu, the dependency can be
+installed with:
+
+    # install libjudy dependency:
+    apt instal libjudy-dev
+
 ### Using PECL
+
+Make sure to install dependencies, and then:
 
     pecl install memprof
 
 ### Manually
+
+Make sure to install dependencies, and then:
 
 Download the source and run the following commands in the source directory:
 
@@ -86,44 +43,47 @@ Or permanently, in php.ini:
 
 ## Usage
 
-Memprof can be enabled during script execution by calling ``memprof_enable()``.
+Profiling is enabled at request startup when one of these is true:
 
-Then the memory usage can be dumped by calling one of the ``memprof_dump_``
-functions. Both tell which functions allocated all the currently allocated
-memory.
+ * The environment variable `MEMPROF_PROFILE` is non-empty
+ * `$_GET["MEMPROF_PROFILE"]` is non-empty
+ * `$_POST["MEMPROF_PROFILE"]` is non-empty
+
+Once profiling is enabled, the program must call ``memprof_dump_callgrind`` or
+one it its variants".
 
 Example:
 
 ```
-<?php
-
-if (function_exists('memprof_enable')) {
-    memprof_enable();
-}
+<?php // test.php
 
 do_some_work();
 
-if (function_exists('memprof_enable')) {
+if (function_exists('memprof_enabled') && memprof_enabled()) {
     memprof_dump_callgrind(fopen("/tmp/callgrind.out", "w"));
 }
 ```
+
+```
+MEMPROF_PROFILE=1 php test.php
+```
+
+Or:
+
+```
+curl http://127.0.0.1/test.php?MEMPROF_PROFILE=1
+```
+
+Whem using ``memprof_dump_callgrind``, the profile can be visualized with
+Kcachegrind or Qcachegrind (see bellow).
 
 ### memprof_enabled()
 
 Returns whether memprof is enabled.
 
-### memprof_enable()
-
-Enables memprof and start tracking memory allocations. Note: any memory
-allocation made before this call is ignored.
-
-### memprof_disable()
-
-Disables memprof and forget previous allocations.
-
 ### memprof_dump_callgrind(resource $stream)
 
-The memprof_dump_callgrind function dumps the current memory usage to a stream
+The memprof_dump_callgrind function dumps the current profile to a stream
 in callgrind format. The file can then be read with tools such as
 [KCacheGrind][2] or [QCacheGrind][6].
 
@@ -251,18 +211,17 @@ Example output:
         )
     )
 
-## PHP 7
+## PHP 7, PHP 8
 
-The current branch supports PHP 7 only.
+The current branch supports PHP 7 and PHP 8.
 
 ## PHP 5
 
 The php5 branch supports PHP 5.
 
-## Todo
+## How it works
 
- * Support for tracking persistent (non-zend-alloc) allocations when libc
-   doesn't have malloc hooks
+See [INTERNALS.md][7]
 
 [1]: https://www.gnu.org/software/libc/manual/html_node/Hooks-for-Malloc.html#Hooks-for-Malloc
 [2]: https://kcachegrind.github.io/html/Home.html
@@ -271,4 +230,3 @@ The php5 branch supports PHP 5.
 [5]: https://github.com/gperftools/gperftools
 [6]: https://www.google.com/search?q=qcachegrind
 [7]: https://github.com/arnaud-lb/php-memory-profiler/blob/master/INTERNALS.md
-
