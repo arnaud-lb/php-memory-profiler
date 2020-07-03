@@ -22,8 +22,10 @@ $b = Eater::eat();
 
 var_dump(memprof_dump_array());
 
---EXPECT--
+--EXPECTF--
 string(9) "Exception"
+
+Warning: Calling memprof_enable() manually may not work as expected because of PHP optimizations. Prefer using MEMPROF_PROFILE=1 as environment variable, GET, or POST in %s
 array(6) {
   ["memory_size"]=>
   int(0)
