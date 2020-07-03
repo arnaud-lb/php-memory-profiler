@@ -41,6 +41,8 @@ Or permanently, in php.ini:
 
     extension=memprof.so
 
+The extension has no overhead when not profiling, so it can be enabled by default on dev environments.
+
 ## Usage
 
 Profiling is enabled at request startup when one of these is true:
