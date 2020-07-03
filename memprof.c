@@ -32,6 +32,7 @@
 #endif
 #include <assert.h>
 
+#define MEMPROF_ENV_PROFILE "MEMPROF_PROFILE"
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
 #ifdef ZTS
@@ -1354,12 +1355,3 @@ PHP_FUNCTION(memprof_enabled)
 	RETURN_BOOL(memprof_enabled);
 }
 /* }}} */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: et sw=4 ts=4 fdm=marker
- * vim<600: et sw=4 ts=4
- */
