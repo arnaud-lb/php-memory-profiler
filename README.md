@@ -2,7 +2,21 @@
 
 ![Supported PHP versions: 7.0 ... 8.x](https://img.shields.io/badge/php-7.0%20...%208.x-blue.svg)
 
-php-memprof is a memory profiler for PHP that can be used to detect memory leaks.
+php-memprof is a fast and accurate memory profiling extension for PHP that can be used to detect memory leaks.
+
+## Features
+
+The extension tracks the allocation and release of memory blocks to report the amount of memory leaked by every function, method, or file in a program.
+
+ * Reports non-freed memory at arbitrary points in the program
+ * Dumps profile in callgrind, pprof, or raw array formats
+ * Can track memory allocated by PHP itself as well as native malloc
+
+### How does it differ from Blackfire ?
+
+Accuracy: Blackfire tracks how functions affect the total memory usage (memory_usage_after - memory_usage_before, for each function call). Memprof tracks every allocated memory block in the program, and reports what has not been freed at an arbitrary point in the program. In effect, the difference between these two strategies is that functions that allocate small amounts of memory but whose allocations are retained may not be visible in Blackfire, whereas functions that allocate big chunks of memory that are freed by the caller will look like big memory consumers although they are not really.
+
+Native malloc: Memprof can track the memory allocated with malloc(), in addition to PHP's own allocator.
 
 ## Install
 
@@ -41,9 +55,13 @@ Or permanently, in php.ini:
 
     extension=memprof.so
 
-The extension has no overhead when not profiling, so it can be enabled by default on dev environments.
+The extension has no overhead when not profiling, so it can be loaded by default on dev environments.
 
 ## Usage
+
+Using the extension is done in three steps:
+
+### 1. Enabling profile
 
 Profiling is enabled at request startup when one of these is true:
 
@@ -51,10 +69,23 @@ Profiling is enabled at request startup when one of these is true:
  * `$_GET["MEMPROF_PROFILE"]` is non-empty
  * `$_POST["MEMPROF_PROFILE"]` is non-empty
 
-Once profiling is enabled, the program must call ``memprof_dump_callgrind`` or
-one it its variants".
+### 2. Dumping the profile
 
-Example:
+Once profiling is enabled, the program must call ``memprof_dump_callgrind()`` or
+one it its variants to dump the memory profile.
+
+This can be done at anytime during the program, ideally when the leak is large,
+so that it will be more visible in the profile.
+
+This can be done multiple times during the same execution, if necessary.
+
+### 3. Visualizing the profile
+
+The profile can be visualised with Kcachegrind, Qcachegrind, Google Perftools,
+or with custom tools. See the documentation of ``the memprof_dump_callgrind()``
+and variants.
+
+### Usage example
 
 ```
 <?php // test.php
@@ -66,27 +97,33 @@ if (function_exists('memprof_enabled') && memprof_enabled()) {
 }
 ```
 
+When ran on the command line, profiling can be enabled by setting the `MEMPROF_PROFILE` environment variable:
+
 ```
 MEMPROF_PROFILE=1 php test.php
 ```
 
-Or:
+When ran in a web context, profiling can be enabled by setting the `MEMPROF_PROFILE` query string parameter or POST field:
 
 ```
 curl http://127.0.0.1/test.php?MEMPROF_PROFILE=1
 ```
 
-Whem using ``memprof_dump_callgrind``, the profile can be visualized with
-Kcachegrind or Qcachegrind (see bellow).
+Setting a POST field works as well:
+
+```
+curl -d MEMPROF_PROFILE=1 http://127.0.0.1/test.php
+```
+
+## Functions documentation
 
 ### memprof_enabled()
 
-Returns whether memprof is enabled.
+Returns whether memory profiling is currently enabled (see above).
 
 ### memprof_dump_callgrind(resource $stream)
 
-The memprof_dump_callgrind function dumps the current profile to a stream
-in callgrind format. The file can then be read with tools such as
+Dumps the current profile in callgrind format. The result can be visualized with tools such as
 [KCacheGrind][2] or [QCacheGrind][6].
 
 ``` php
@@ -100,15 +137,14 @@ Here is a QcacheGrind screenshot:
 
 ### memprof_dump_pprof(resource $stream)
 
-The memprof_dump_pprof function dumps the current memory usage to a stream in
-[pprof][4] format.
+Dumps the current profile in [pprof][4] format.
 
 ``` php
 <?php
 memprof_dump_pprof(fopen("profile.heap", "w"));
 ```
 
-The file can be visualized using [google-perftools][5]'s [``pprof``][4] tool.
+The file can be visualized with [google-perftools][5]'s [``pprof``][4] tool.
 
 Display annotated call-graph in web browser or in ``gv``:
 
@@ -118,7 +154,7 @@ $ # or:
 $ pprof --gv profile.heap
 ```
 
-![pprof call-graph screenshot](http://img707.imageshack.us/img707/7697/screenshot3go.png)
+![pprof call-graph screenshot](https://i.stack.imgur.com/EAnGC.png)
 
 Output one line per function, sorted by own memory usage:
 
@@ -128,17 +164,19 @@ $ pprof --text profile.heap
 
 ### memprof_dump_array()
 
+Returns an array representing the current profile.
+
 ``` php
 <?php
 $dump = memprof_dump_array();
 ```
 
-The dump exposes the following information:
+The array exposes the following information:
 
- * Inclusive and exclusive memory usage of functions (counting only the memory
-   that has is still in use when memprof_dump_array is called)
- * Inclusive and exclusive blocks count of functions (number of allocated;
-   counting only the blocks that are still in use when memprof_dump_array is
+ * Inclusive and exclusive memory leaked by functions (counting only the memory
+   that has is still not freed when memprof_dump_array is called)
+ * Inclusive and exclusive blocks count of functions (number of allocations;
+   counting only the blocks that are still not freed when memprof_dump_array is
    called)
  * The data is presented in call stacks. This way, if a function is called from
    multiple places, it is possible to see which call path caused it to leak the
@@ -213,11 +251,9 @@ Example output:
         )
     )
 
-## PHP 7, PHP 8
+## PHP versions
 
 The current branch supports PHP 7 and PHP 8.
-
-## PHP 5
 
 The php5 branch supports PHP 5.
 
