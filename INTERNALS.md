@@ -64,3 +64,6 @@ and ``zend_execute_internal`` functions. The former is called when the
 engine executes a userland php function, and the later is called for internal
 php functions.
 
+These are function pointers meant to be changed by extensions. However, when
+they are not changed, PHP might emit opcodes that don't use them. So we have
+to change them during request init, before any file is compiled.
