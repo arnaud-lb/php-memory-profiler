@@ -787,7 +787,9 @@ static void memprof_disable()
 	allocs_set = (Pvoid_t) NULL;
 
 	if (!memprof_dumped) {
-		zend_error(E_WARNING, "Memprof profiling was enabled, but no profile was dumped. Did you forget to call one of memprof_dump_callgrind(), memprof_dump_pprof(), or memprof_dump_array() ?");
+		// Calling this during RSHUTDOWN breaks zend_deactivate_modules(), which
+		// causes corruption of global state.
+		// zend_error(E_WARNING, "Memprof profiling was enabled, but no profile was dumped. Did you forget to call one of memprof_dump_callgrind(), memprof_dump_pprof(), or memprof_dump_array() ?");
 	}
 }
 
