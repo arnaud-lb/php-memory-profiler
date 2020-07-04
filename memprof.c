@@ -192,9 +192,9 @@ static int memprof_enabled = 0;
 static int memprof_dumped = 0;
 static int track_mallocs = 0;
 
-static frame default_frame;
-static frame * current_frame = &default_frame;
-static alloc_list_head * current_alloc_list = &default_frame.allocs;
+static frame root_frame;
+static frame * current_frame;
+static alloc_list_head * current_alloc_list;
 static alloc_buckets current_alloc_buckets;
 
 static Pvoid_t allocs_set = (Pvoid_t) NULL;
@@ -245,9 +245,11 @@ static void alloc_check_single(alloc * alloc, const char * function, int line) {
 static void alloc_check(alloc * alloc, const char * function, int line) {
 	/* fprintf(stderr, "checking %p at %s:%d\n", alloc, function, line); */
 	alloc_check_single(alloc, function, line);
+	/*
 	for (alloc = current_alloc_list->lh_first; alloc; alloc = alloc->list.le_next) {
 		alloc_check_single(alloc, function, line);
 	}
+	*/
 }
 
 #	define ALLOC_CHECK(alloc) alloc_check(alloc, __FUNCTION__, __LINE__);
@@ -262,7 +264,15 @@ static void alloc_buckets_destroy(alloc_buckets * buckets)
 	for (i = 0; i < buckets->nbuckets; ++i) {
 		free(buckets->buckets[i]);
 	}
+
+#if MEMPROF_DEBUG
+	memset(buckets->buckets, 0x5a, buckets->nbuckets * sizeof(buckets->buckets[0]));
+#endif
 	free(buckets->buckets);
+
+#if MEMPROF_DEBUG
+	memset(buckets, 0x5a, sizeof(*buckets));
+#endif
 }
 
 static void alloc_buckets_grow(alloc_buckets * buckets)
@@ -321,6 +331,9 @@ static void destroy_frame(frame * f)
 {
 	alloc * a;
 
+#if MEMPROF_DEBUG
+	memset(f->name, 0x5a, f->name_len);
+#endif
 	free(f->name);
 
 	while (f->allocs.lh_first) {
@@ -330,6 +343,10 @@ static void destroy_frame(frame * f)
 	}
 
 	zend_hash_destroy(&f->next_cache);
+
+#if MEMPROF_DEBUG
+	memset(f, 0x5a, sizeof(*f));
+#endif
 }
 
 /* HashTable destructor */
@@ -393,7 +410,7 @@ static int frame_stack_depth(const frame * f)
 	const frame * prev;
 	int depth = 0;
 
-	for (prev = f; prev; prev = prev->prev) {
+	for (prev = f; prev != &root_frame; prev = prev->prev) {
 		depth ++;
 	}
 
@@ -700,7 +717,7 @@ static PHP_INI_MH(OnChangeMemoryLimit)
 
 	ret = origOnChangeMemoryLimit(entry, new_value, mh_arg1, mh_arg2, mh_arg3, stage);
 
-	if (memprof_enabled) {
+	if (memprof_enabled && orig_zheap) {
 		zend_mm_set_heap(orig_zheap);
 		ret = zend_set_memory_limit(PG(memory_limit));
 		zend_mm_set_heap(zheap);
@@ -713,8 +730,11 @@ static void memprof_enable()
 {
 	alloc_buckets_init(&current_alloc_buckets);
 
-	init_frame(&default_frame, NULL, "root", sizeof("root")-1);
-	default_frame.calls = 1;
+	init_frame(&root_frame, &root_frame, "root", sizeof("root")-1);
+	root_frame.calls = 1;
+
+	current_frame = &root_frame;
+	current_alloc_list = &root_frame.allocs;
 
 	MALLOC_HOOK_SAVE_OLD();
 	MALLOC_HOOK_SET_OWN();
@@ -759,7 +779,7 @@ static void memprof_disable()
 
 	memprof_enabled = 0;
 
-	destroy_frame(&default_frame);
+	destroy_frame(&root_frame);
 
 	alloc_buckets_destroy(&current_alloc_buckets);
 
@@ -1188,7 +1208,7 @@ static void dump_frames_pprof(php_stream * stream, HashTable * symbols, frame * 
 		stream_write_word(stream, size);
 		stream_write_word(stream, stack_depth);
 
-		for (prev = f; prev; prev = prev->prev) {
+		for (prev = f; prev != &root_frame; prev = prev->prev) {
 			zend_uintptr_t symaddr;
 			symaddr = (zend_uintptr_t) zend_hash_str_find_ptr(symbols, prev->name, prev->name_len);
 			if (symaddr == 0) {
@@ -1260,7 +1280,7 @@ PHP_FUNCTION(memprof_dump_array)
 
 	WITHOUT_MALLOC_TRACKING {
 
-		dump_frame_array(return_value, &default_frame);
+		dump_frame_array(return_value, &root_frame);
 
 	} END_WITHOUT_MALLOC_TRACKING;
 
@@ -1296,7 +1316,7 @@ PHP_FUNCTION(memprof_dump_callgrind)
 		stream_printf(stream, "events: MemorySize BlocksCount\n");
 		stream_printf(stream, "\n");
 
-		dump_frame_callgrind(stream, &default_frame, "root", &total_size, &total_count);
+		dump_frame_callgrind(stream, &root_frame, "root", &total_size, &total_count);
 
 		stream_printf(stream, "total: %zu %zu\n", total_size, total_count);
 
@@ -1333,7 +1353,7 @@ PHP_FUNCTION(memprof_dump_pprof)
 
 		stream_printf(stream, "--- symbol\n");
 		stream_printf(stream, "binary=todo.php\n");
-		dump_frames_pprof_symbols(stream, &symbols, &default_frame);
+		dump_frames_pprof_symbols(stream, &symbols, &root_frame);
 		stream_printf(stream, "---\n");
 		stream_printf(stream, "--- profile\n");
 
@@ -1350,7 +1370,7 @@ PHP_FUNCTION(memprof_dump_pprof)
 		/* unused padding */
 		stream_write_word(stream, 0);
 
-		dump_frames_pprof(stream, &symbols, &default_frame);
+		dump_frames_pprof(stream, &symbols, &root_frame);
 
 		zend_hash_destroy(&symbols);
 
