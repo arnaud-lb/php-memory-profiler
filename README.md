@@ -133,7 +133,7 @@ memprof_dump_callgrind(fopen("output", "w"));
 
 Here is a QcacheGrind screenshot:
 
-![QCacheGrind screenshot](https://raw.githubusercontent.com/arnaud-lb/php-memory-profiler/master/assets/qcachegrind.png)
+![QCacheGrind screenshot](https://raw.githubusercontent.com/arnaud-lb/php-memory-profiler/v2/assets/qcachegrind.png)
 
 ### memprof_dump_pprof(resource $stream)
 
