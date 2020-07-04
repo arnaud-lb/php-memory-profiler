@@ -2,18 +2,18 @@
 <package packagerversion="1.9.4" version="2.1" xmlns="http://pear.php.net/dtd/package-2.1" xmlns:tasks="http://pear.php.net/dtd/tasks-1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pear.php.net/dtd/tasks-1.0     http://pear.php.net/dtd/tasks-1.0.xsd     http://pear.php.net/dtd/package-2.1     http://pear.php.net/dtd/package-2.1.xsd">
  <name>memprof</name>
  <channel>pecl.php.net</channel>
- <summary>memory usage profiler</summary>
- <description>Memory usage profiler for PHP scripts.</description>
+ <summary>Memory profiler</summary>
+ <description>Memprof is a fast and accurate memory profiler that can be used to find the cause of memory leaks in PHP applications.</description>
  <lead>
   <name>Arnaud Le Blanc</name>
   <user>lbarnaud</user>
   <email>lbarnaud@php.net</email>
   <active>yes</active>
  </lead>
- <date>2017-01-28</date>
+ <date>2020-07-04</date>
  <time>12:00:00</time>
  <version>
-  <release>2.0.0</release>
+  <release>2.1.0</release>
   <api>1.0.0</api>
  </version>
  <stability>
@@ -22,7 +22,8 @@
  </stability>
  <license>BSD</license>
  <notes>
-  * PHP 7 version
+  * Added a way to trigger profiling from the environment
+  * Stability improvements
  </notes>
  <contents>
   <dir name="/">
@@ -49,6 +50,22 @@
  <providesextension>memprof</providesextension>
  <extsrcrelease />
  <changelog>
+  <release>
+   <date>2017-01-28</date>
+   <time>12:00:00</time>
+   <version>
+    <release>2.0.0</release>
+    <api>1.0.0</api>
+   </version>
+   <stability>
+    <release>stable</release>
+    <api>stable</api>
+   </stability>
+   <license>BSD</license>
+   <notes>
+    * PHP 7 version
+   </notes>
+  </release>
   <release>
    <date>2013-05-21</date>
    <time>17:05:36</time>
