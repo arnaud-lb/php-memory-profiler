@@ -1029,6 +1029,7 @@ PHP_MINFO_FUNCTION(memprof)
 {
 	php_info_print_table_start();
 	php_info_print_table_header(2, "memprof support", "enabled");
+	php_info_print_table_header(2, "memprof version", PHP_MEMPROF_VERSION);
 #if MEMPROF_DEBUG
 	php_info_print_table_header(2, "debug build", "Yes");
 #endif
