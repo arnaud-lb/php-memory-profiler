@@ -946,9 +946,13 @@ PHP_MINIT_FUNCTION(memprof)
 
 	for (fentry = memprof_function_overrides; fentry->fname; fentry++) {
 		size_t name_len = strlen(fentry->fname);
-		zend_hash_str_del(CG(function_table), fentry->fname, name_len);
+		zend_internal_function * orig = zend_hash_str_find_ptr(CG(function_table), fentry->fname, name_len);
+		if (orig != NULL && orig->type == ZEND_INTERNAL_FUNCTION) {
+			orig->handler = fentry->handler;
+		} else {
+			zend_error(E_WARNING, "memprof: Could not override %s(), return value from this function may be be accurate.", fentry->fname);
+		}
 	}
-	zend_register_functions(NULL, memprof_function_overrides, NULL, type);
 
 	return SUCCESS;
 }
