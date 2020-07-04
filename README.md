@@ -251,11 +251,20 @@ Example output:
         )
     )
 
+## Troubleshooting
+
+ * If you are experiencing crashes, try disabling malloc hooks by setting HAVE_MALLOC_HOOKS to 0 in config.h after running configure; then run ``make clean && make && make install``.
+ * The extensions may conflict with xdebug, blackfire, or other extensions. If that's the case for you, please report it.
+
 ## PHP versions
 
 The current branch supports PHP 7 and PHP 8.
 
 The php5 branch supports PHP 5.
+
+## TODO
+
+ * Thread-safe malloc hooks
 
 ## How it works
 
