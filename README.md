@@ -26,7 +26,7 @@ php-memprof depends on libjudy. On Debian or Ubuntu, the dependency can be
 installed with:
 
     # install libjudy dependency:
-    apt instal libjudy-dev
+    apt install -y libjudy-dev
 
 ### Using PECL
 
