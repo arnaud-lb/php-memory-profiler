@@ -56,6 +56,10 @@ size_t get_function_name(zend_execute_data * execute_data, char * buf, size_t bu
 		return snprintf(buf, buf_size, "main");
 	}
 
+	if (execute_data->func == &zend_pass_function) {
+		return snprintf(buf, buf_size, "zend_pass_function");
+	}
+
 	zname = func->common.function_name;
 
 	if (zname == NULL) {

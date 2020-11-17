@@ -672,7 +672,9 @@ static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, z
 {
 	int ignore = 0;
 
-	if (execute_data_ptr->func->common.function_name) {
+	if (execute_data_ptr->func == &zend_pass_function) {
+		ignore = 1;
+	} else if (execute_data_ptr->func->common.function_name) {
 		zend_string * name = execute_data_ptr->func->common.function_name;
 		if (ZSTR_LEN(name) == sizeof("call_user_func")-1
 				&& 0 == memcmp(name, "call_user_func", sizeof("call_user_func")))
