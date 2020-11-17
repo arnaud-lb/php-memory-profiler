@@ -51,5 +51,6 @@ PHP_FUNCTION(memprof_memory_get_peak_usage);
 PHP_FUNCTION(memprof_enable);
 PHP_FUNCTION(memprof_disable);
 PHP_FUNCTION(memprof_enabled);
+PHP_FUNCTION(memprof_enabled_flags);
 
 #endif	/* PHP_MEMPROF_H */

@@ -63,15 +63,18 @@ Profiling is enabled at request startup when one of these is true:
  * `$_GET["MEMPROF_PROFILE"]` is non-empty
  * `$_POST["MEMPROF_PROFILE"]` is non-empty
 
+The `memprof_enabled()` function can be called to check whether profiling is
+currently enabled.
+
 ### 2. Dumping the profile
 
-Once profiling is enabled, the program must call ``memprof_dump_callgrind()`` or
-one it its variants to dump the memory profile.
+When profiling is enabled, and once the program has reached a large memory usage,
+call ``memprof_dump_callgrind()`` or one it its variants to save the full
+profiling information to a file.
 
-This can be done at anytime during the program, ideally when the leak is large,
-so that it will be more visible in the profile.
-
-This can be done multiple times during the same execution, but this is not necessary.
+* Calling the function multiple times is not necessary
+* Waiting for a high memory usage before saving the profile makes it easier to
+  find a leak
 
 ### 3. Visualizing the profile
 
@@ -127,11 +130,31 @@ Setting a POST field works as well:
 curl -d MEMPROF_PROFILE=1 http://127.0.0.1/test.php
 ```
 
+### Profiling native allocations
+
+Memprof doesn't track native allocations by default, but this can be enabled
+by setting `MEMPROF_PROFILE` to `native`.
+
+Native allocations are the allocations made outside of PHP's own memory
+allocator. Typically, external libraries such as libxml2 (used in the DOM
+extension) make native allocations. PHP can also make native allocations for
+persistent resources.
+
+Enabling native allocation tracking will profile these allocations in addition
+to PHP's own allocations.
+
+Note that when native tracking is enabled, the program will crash if a native
+library uses threads, because the underlying hooks are not thread safe.
+
 ## Functions documentation
 
 ### memprof_enabled()
 
 Returns whether memory profiling is currently enabled (see above).
+
+### memprof_enabled_flags()
+
+Returns whether memory profiling and native profiling are enabled (see above).
 
 ### memprof_dump_callgrind(resource $stream)
 
@@ -265,7 +288,6 @@ Example output:
 
 ## Troubleshooting
 
- * If you are experiencing crashes, try disabling malloc hooks by setting HAVE_MALLOC_HOOKS to 0 in config.h after running configure; then run ``make clean && make && make install``. (Using malloc hooks may crash if some other extension uses threads internally.)
  * The extensions may conflict with xdebug, blackfire, or other extensions. If that's the case for you, please report it.
 
 ## PHP versions
@@ -273,10 +295,6 @@ Example output:
 The current branch supports PHP 7.1 to PHP 8.
 
 The php5 branch supports PHP 5.
-
-## TODO
-
- * Thread-safe malloc hooks
 
 ## How it works
 

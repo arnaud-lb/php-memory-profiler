@@ -33,6 +33,8 @@
 #include <assert.h>
 
 #define MEMPROF_ENV_PROFILE "MEMPROF_PROFILE"
+#define MEMPROF_FLAG_NATIVE "native"
+
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
 #ifdef ZTS
@@ -187,6 +189,9 @@ static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, zv
 #define zend_execute_fn zend_execute_ex
 
 static PHP_INI_MH((*origOnChangeMemoryLimit)) = NULL;
+
+#define MEMPROF_ENABLED			(1<<0)
+#define MEMPROF_ENABLED_NATIVE  (1<<1)
 
 static int memprof_enabled = 0;
 static int memprof_dumped = 0;
@@ -732,8 +737,10 @@ static PHP_INI_MH(OnChangeMemoryLimit)
 	return SUCCESS;
 }
 
-static void memprof_enable()
+static void memprof_enable(int flags)
 {
+	assert(flags & MEMPROF_ENABLED);
+
 	alloc_buckets_init(&current_alloc_buckets);
 
 	init_frame(&root_frame, &root_frame, "root", sizeof("root")-1);
@@ -742,10 +749,12 @@ static void memprof_enable()
 	current_frame = &root_frame;
 	current_alloc_list = &root_frame.allocs;
 
-	MALLOC_HOOK_SAVE_OLD();
-	MALLOC_HOOK_SET_OWN();
+	if (flags & MEMPROF_ENABLED_NATIVE) {
+		MALLOC_HOOK_SAVE_OLD();
+		MALLOC_HOOK_SET_OWN();
+	}
 
-	memprof_enabled = 1;
+	memprof_enabled = flags;
 	memprof_dumped = 0;
 
 	if (is_zend_mm()) {
@@ -781,7 +790,9 @@ static void memprof_disable()
 		free(zheap);
 	}
 
-	MALLOC_HOOK_RESTORE_OLD();
+	if (memprof_enabled & MEMPROF_ENABLED_NATIVE) {
+		MALLOC_HOOK_RESTORE_OLD();
+	}
 
 	memprof_enabled = 0;
 
@@ -852,12 +863,22 @@ static zend_string* read_env_get_post(char *name, size_t len)
 
 static int should_autostart()
 {
+	char *saveptr;
+	const char *delim = ",";
+	char *flag;
+
 	zend_string *value = read_env_get_post(MEMPROF_ENV_PROFILE, strlen(MEMPROF_ENV_PROFILE));
 	if (value == NULL) {
 		return 0;
 	}
 
-	int autostart = ZSTR_LEN(value) > 0;
+	int autostart = ZSTR_LEN(value) > 0 ? MEMPROF_ENABLED : 0;
+
+	for (flag = strtok_r(ZSTR_VAL(value), delim, &saveptr); flag != NULL; flag = strtok_r(NULL, delim, &saveptr)) {
+		if (HAVE_MALLOC_HOOKS && strcmp(MEMPROF_FLAG_NATIVE, flag) == 0) {
+			autostart |= MEMPROF_ENABLED_NATIVE;
+		}
+	}
 
 	zend_string_release(value);
 
@@ -913,6 +934,7 @@ ZEND_END_ARG_INFO()
  */
 const zend_function_entry memprof_functions[] = {
 	PHP_FE(memprof_enabled, arginfo_void)
+	PHP_FE(memprof_enabled_flags, arginfo_void)
 	PHP_FE(memprof_enable, arginfo_void)
 	PHP_FE(memprof_disable, arginfo_void)
 	PHP_FE(memprof_dump_array, arginfo_void)
@@ -1008,9 +1030,11 @@ PHP_MSHUTDOWN_FUNCTION(memprof)
  */
 PHP_RINIT_FUNCTION(memprof)
 {
-	if (should_autostart()) {
+	int flags = should_autostart();
+
+	if (flags) {
 		disable_opcache();
-		memprof_enable();
+		memprof_enable(flags);
 	}
 
 	return SUCCESS;
@@ -1036,6 +1060,7 @@ PHP_MINFO_FUNCTION(memprof)
 	php_info_print_table_start();
 	php_info_print_table_header(2, "memprof support", "enabled");
 	php_info_print_table_header(2, "memprof version", PHP_MEMPROF_VERSION);
+	php_info_print_table_header(2, "memprof native malloc support", HAVE_MALLOC_HOOKS ? "yes" : "no");
 #if MEMPROF_DEBUG
 	php_info_print_table_header(2, "debug build", "Yes");
 #endif
@@ -1444,7 +1469,7 @@ PHP_FUNCTION(memprof_enable)
 
 	zend_error(E_WARNING, "Calling memprof_enable() manually may not work as expected because of PHP optimizations. Prefer using MEMPROF_PROFILE=1 as environment variable, GET, or POST");
 
-	memprof_enable();
+	memprof_enable(MEMPROF_ENABLED);
 
 	RETURN_TRUE;
 }
@@ -1469,7 +1494,7 @@ PHP_FUNCTION(memprof_disable)
 }
 /* }}} */
 
-/* {{{ proto bool memprof_disabled()
+/* {{{ proto bool memprof_enabled()
    Returns whether memprof is enabled */
 PHP_FUNCTION(memprof_enabled)
 {
@@ -1477,6 +1502,20 @@ PHP_FUNCTION(memprof_enabled)
 		return;
 	}
 
-	RETURN_BOOL(memprof_enabled);
+	RETURN_BOOL(memprof_enabled & MEMPROF_ENABLED);
+}
+/* }}} */
+
+/* {{{ proto array memprof_enabled_flags()
+   Returns whether memprof is enabled */
+PHP_FUNCTION(memprof_enabled_flags)
+{
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "") == FAILURE) {
+		return;
+	}
+
+	array_init(return_value);
+	add_assoc_bool(return_value, "enabled", (memprof_enabled & MEMPROF_ENABLED) != 0);
+	add_assoc_bool(return_value, "native", (memprof_enabled & MEMPROF_ENABLED_NATIVE) != 0);
 }
 /* }}} */
