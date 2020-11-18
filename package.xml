@@ -34,6 +34,16 @@
    <file name="LICENSE" role="doc" />
    <file name="INTERNALS.md" role="doc" />
    <file name="README.md" role="doc" />
+   <dir name="tests">
+     <file name="001.phpt" role="test" />
+     <file name="002.phpt" role="test" />
+     <file name="003.phpt" role="test" />
+     <file name="004.phpt" role="test" />
+     <file name="005.phpt" role="test" />
+     <file name="006.phpt" role="test" />
+     <file name="common.php" role="test" />
+     <file name="zend_pass_function.phpt" role="test" />
+   </dir>
   </dir>
  </contents>
  <dependencies>
