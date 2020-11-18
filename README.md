@@ -26,7 +26,7 @@ php-memprof depends on libjudy. On Debian or Ubuntu, the dependency can be
 installed with:
 
     # install libjudy dependency:
-    apt instal libjudy-dev
+    apt install libjudy-dev
 
 ### Using PECL
 
@@ -253,7 +253,7 @@ Example output:
 
 ## Troubleshooting
 
- * If you are experiencing crashes, try disabling malloc hooks by setting HAVE_MALLOC_HOOKS to 0 in config.h after running configure; then run ``make clean && make && make install``. (Using malloc hooks may crash if some other extension uses threads internally.)  
+ * If you are experiencing crashes, try disabling malloc hooks by setting HAVE_MALLOC_HOOKS to 0 in config.h after running configure; then run ``make clean && make && make install``. (Using malloc hooks may crash if some other extension uses threads internally.)
  * The extensions may conflict with xdebug, blackfire, or other extensions. If that's the case for you, please report it.
 
 ## PHP versions
