@@ -1,5 +1,5 @@
 --TEST--
-Enable with environment variable
+zend_pass_function crash
 --ENV--
 MEMPROF_PROFILE=1
 --FILE--

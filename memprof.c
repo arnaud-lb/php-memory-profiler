@@ -672,7 +672,7 @@ static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, z
 {
 	int ignore = 0;
 
-	if (execute_data_ptr->func == &zend_pass_function) {
+	if (&execute_data_ptr->func->internal_function == &zend_pass_function) {
 		ignore = 1;
 	} else if (execute_data_ptr->func->common.function_name) {
 		zend_string * name = execute_data_ptr->func->common.function_name;
@@ -719,13 +719,17 @@ static PHP_INI_MH(OnChangeMemoryLimit)
 
 	ret = origOnChangeMemoryLimit(entry, new_value, mh_arg1, mh_arg2, mh_arg3, stage);
 
+	if (ret != SUCCESS) {
+		return ret;
+	}
+
 	if (memprof_enabled && orig_zheap) {
 		zend_mm_set_heap(orig_zheap);
-		ret = zend_set_memory_limit(PG(memory_limit));
+		zend_set_memory_limit(PG(memory_limit));
 		zend_mm_set_heap(zheap);
 	}
 
-	return ret;
+	return SUCCESS;
 }
 
 static void memprof_enable()

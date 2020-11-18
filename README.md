@@ -1,6 +1,6 @@
 # php-memprof
 
-![Supported PHP versions: 7.0 ... 8.x](https://img.shields.io/badge/php-7.0%20...%208.x-blue.svg)
+![Supported PHP versions: 7.1 ... 8.x](https://img.shields.io/badge/php-7.1%20...%208.x-blue.svg) [![Build Status](https://travis-ci.com/arnaud-lb/php-memory-profiler.svg?branch=v2)](https://travis-ci.com/arnaud-lb/php-memory-profiler)
 
 php-memprof is a fast and accurate memory profiling extension for PHP that can be used to detect memory leaks.
 

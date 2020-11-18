@@ -51,6 +51,9 @@ if test "$PHP_MEMPROF" != "no"; then
   dnl
   PHP_SUBST(MEMPROF_SHARED_LIBADD)
 
+  ORIG_CFLAGS="$CFLAGS"
+  CFLAGS=""
+
   AC_MSG_CHECKING(for malloc hooks)
   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     #include <malloc.h>
@@ -69,6 +72,8 @@ if test "$PHP_MEMPROF" != "no"; then
   ],[
     AC_MSG_RESULT(no)
   ])
+
+  CFLAGS="$ORIG_CFLAGS"
 
   AC_DEFINE([MEMPROF_CONFIGURE_VERSION], 3, [Define configure version])
 
