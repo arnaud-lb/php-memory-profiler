@@ -10,10 +10,10 @@
   <email>lbarnaud@php.net</email>
   <active>yes</active>
  </lead>
- <date>2020-07-04</date>
+ <date>2020-11-18</date>
  <time>12:00:00</time>
  <version>
-  <release>2.1.0</release>
+  <release>2.1.1</release>
   <api>1.0.0</api>
  </version>
  <stability>
@@ -22,8 +22,7 @@
  </stability>
  <license>BSD</license>
  <notes>
-  * Added a way to trigger profiling from the environment
-  * Stability improvements
+  * Fix crash on zend_pass_function
  </notes>
  <contents>
   <dir name="/">
@@ -50,6 +49,23 @@
  <providesextension>memprof</providesextension>
  <extsrcrelease />
  <changelog>
+  <release>
+   <date>2020-07-04</date>
+   <time>12:00:00</time>
+   <version>
+    <release>2.1.0</release>
+    <api>1.0.0</api>
+   </version>
+   <stability>
+    <release>stable</release>
+    <api>stable</api>
+   </stability>
+   <license>BSD</license>
+   <notes>
+    * Added a way to trigger profiling from the environment
+    * Stability improvements
+   </notes>
+  </release>
   <release>
    <date>2017-01-28</date>
    <time>12:00:00</time>
