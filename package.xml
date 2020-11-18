@@ -39,10 +39,10 @@
  <dependencies>
   <required>
    <php>
-    <min>7.0.0</min>
+    <min>7.1.0</min>
    </php>
    <pearinstaller>
-    <min>1.4.8</min>
+    <min>1.10.0</min>
    </pearinstaller>
   </required>
  </dependencies>
