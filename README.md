@@ -258,7 +258,7 @@ Example output:
 
 ## PHP versions
 
-The current branch supports PHP 7 and PHP 8.
+The current branch supports PHP 7.1 to PHP 8.
 
 The php5 branch supports PHP 5.
 

@@ -34,15 +34,25 @@
    <file name="LICENSE" role="doc" />
    <file name="INTERNALS.md" role="doc" />
    <file name="README.md" role="doc" />
+   <dir name="tests">
+     <file name="001.phpt" role="test" />
+     <file name="002.phpt" role="test" />
+     <file name="003.phpt" role="test" />
+     <file name="004.phpt" role="test" />
+     <file name="005.phpt" role="test" />
+     <file name="006.phpt" role="test" />
+     <file name="common.php" role="test" />
+     <file name="zend_pass_function.phpt" role="test" />
+   </dir>
   </dir>
  </contents>
  <dependencies>
   <required>
    <php>
-    <min>7.0.0</min>
+    <min>7.1.0</min>
    </php>
    <pearinstaller>
-    <min>1.4.8</min>
+    <min>1.10.0</min>
    </pearinstaller>
   </required>
  </dependencies>
