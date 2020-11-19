@@ -14,9 +14,9 @@ The extension tracks the allocation and release of memory blocks to report the a
 
 ### How does it differ from Blackfire ?
 
-Accuracy: Blackfire tracks how functions affect the total memory usage (memory_usage_after - memory_usage_before, for each function call). Memprof tracks every allocated memory block in the program, and reports what has not been freed at an arbitrary point in the program. In effect, the difference between these two strategies is that functions that allocate small amounts of memory but whose allocations are retained may not be visible in Blackfire, whereas functions that allocate big chunks of memory that are freed by the caller will look like big memory consumers although they are not really.
+Blackfire measures peak memory during function calls, while Memprof focuses on leaked memory. This makes Memprof more accurate when trying to find the cause of a high memory usage.
 
-Native malloc: Memprof can track the memory allocated with malloc(), in addition to PHP's own allocator.
+An other difference is that Memprof can track native memory, like the memory allocated by libxml when using the DOM extension.
 
 ## Install
 
