@@ -13,6 +13,7 @@
 */
 
 #include "php.h"
+#include "php_memprof.h"
 #include <stdarg.h>
 
 void stream_printf(php_stream * stream, const char * format, ...)

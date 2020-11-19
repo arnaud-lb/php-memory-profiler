@@ -18,6 +18,7 @@ jobs:
         - env: PHP_VERSION=7.3.24
         - env: PHP_VERSION=7.2.19
         - env: PHP_VERSION=7.1.33
+        - env: PHP_VERSION=7.0.29
 
 before_install:
     - |

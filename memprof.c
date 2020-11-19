@@ -44,6 +44,10 @@
 #	error Please rebuild configure (run phpize and reconfigure)
 #endif
 
+#if PHP_MAJOR_VERSION == 7 && PHP_MINOR_VERSION < 1
+	const zend_internal_function memprof_zend_pass_function;
+#endif
+
 #if HAVE_MALLOC_HOOKS
 #	include <malloc.h>
 

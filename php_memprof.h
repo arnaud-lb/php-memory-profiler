@@ -52,4 +52,9 @@ PHP_FUNCTION(memprof_enable);
 PHP_FUNCTION(memprof_disable);
 PHP_FUNCTION(memprof_enabled);
 
+#if PHP_MAJOR_VERSION == 7 && PHP_MINOR_VERSION < 1
+	extern const zend_internal_function memprof_zend_pass_function;
+#	define zend_pass_function memprof_zend_pass_function
+#endif
+
 #endif	/* PHP_MEMPROF_H */
