@@ -12,12 +12,6 @@ The extension tracks the allocation and release of memory blocks to report the a
  * Dumps profile in callgrind, pprof, or raw array formats
  * Can track memory allocated by PHP itself as well as native malloc
 
-### How does it differ from Blackfire ?
-
-Blackfire measures peak memory during function calls, while Memprof focuses on leaked memory. This makes Memprof more accurate when trying to find the cause of a high memory usage.
-
-An other difference is that Memprof can track native memory, like the memory allocated by libxml when using the DOM extension.
-
 ## Install
 
 ### Dependencies
@@ -81,9 +75,27 @@ This can be done multiple times during the same execution, if necessary.
 
 ### 3. Visualizing the profile
 
-The profile can be visualised with Kcachegrind, Qcachegrind, Google Perftools,
-or with custom tools. See the documentation of ``memprof_dump_callgrind()``
-and variants.
+The recommended way to visualize the result is to use Kcachegrind (on Linux) or Qcachegrind (on MacOS, Windows). Google Perftools are also supported. See the documentation of ``memprof_dump_callgrind()`` and variants.
+
+#### Install Kcachegrind on Linux
+
+Most distributions have a `kcachegrind` package ready to be installed.
+
+For example, Ubuntu or Debian:
+
+```
+sudo apt install kcachegrind
+```
+
+Other distributions most likely have a package ready to be installed as well.
+
+#### Install Qcachegrind on MacOS
+
+Use Homebrew: https://formulae.brew.sh/formula/qcachegrind
+
+#### Install Qcachegrind on Windows
+
+Download it from https://sourceforge.net/projects/qcachegrindwin/
 
 ### Usage example
 
@@ -124,7 +136,7 @@ Returns whether memory profiling is currently enabled (see above).
 ### memprof_dump_callgrind(resource $stream)
 
 Dumps the current profile in callgrind format. The result can be visualized with tools such as
-[KCacheGrind][2] or [QCacheGrind][6].
+[KCacheGrind](#install-kcachegrind-on-linux) or [QCacheGrind](#install-qcachegrind-on-macos).
 
 ``` php
 <?php
