@@ -2,7 +2,7 @@
 
 ![Supported PHP versions: 7.1 ... 8.x](https://img.shields.io/badge/php-7.1%20...%208.x-blue.svg) [![Build Status](https://travis-ci.com/arnaud-lb/php-memory-profiler.svg?branch=v2)](https://travis-ci.com/arnaud-lb/php-memory-profiler)
 
-php-memprof is a fast and accurate memory profiling extension for PHP that can be used to detect memory leaks.
+php-memprof is a fast and accurate memory profiling extension for PHP that can be used to find the cause of memory leaks.
 
 ## Features
 
@@ -24,13 +24,13 @@ installed with:
 
 ### Using PECL
 
-Make sure to install dependencies, and then:
+Make sure to install [dependencies](#dependencies), and then:
 
     pecl install memprof
 
 ### Manually
 
-Make sure to install dependencies, and then:
+Make sure to install [dependencies](#dependencies), and then:
 
 Download the source and run the following commands in the source directory:
 
@@ -71,7 +71,7 @@ one it its variants to dump the memory profile.
 This can be done at anytime during the program, ideally when the leak is large,
 so that it will be more visible in the profile.
 
-This can be done multiple times during the same execution, if necessary.
+This can be done multiple times during the same execution, but this is not necessary.
 
 ### 3. Visualizing the profile
 
