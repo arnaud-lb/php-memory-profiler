@@ -51,32 +51,51 @@ Or permanently, in php.ini:
 
 The extension has no overhead when not profiling, so it can be loaded by default on dev environments.
 
-## Usage
+## Usage example
 
-Using the extension is done in three steps:
+The simplest way to use `memprof` is to let it save the memory profile when the
+program's memory limit is exceeded.
 
-### 1. Enabling profile
+### Step 1: Enable profiling in `dump_on_limit` mode
 
-Profiling is enabled at request startup when one of these is true:
+Profiling in `dump_on_limit` mode is enabled at request startup when one
+of these is true:
 
- * The environment variable `MEMPROF_PROFILE` is non-empty
- * `$_GET["MEMPROF_PROFILE"]` is non-empty
- * `$_POST["MEMPROF_PROFILE"]` is non-empty
+ * The environment variable `MEMPROF_PROFILE` is equal to `dump_on_limit`
+ * `$_GET["MEMPROF_PROFILE"]` is equal to `dump_on_limit`
+ * `$_POST["MEMPROF_PROFILE"]` is equal to `dump_on_limit`
 
-The `memprof_enabled()` function can be called to check whether profiling is
-currently enabled.
+For command line scripts, we can set the environment variable:
 
-### 2. Dumping the profile
+```
+MEMPROF_PROFILE=dump_on_limit php test.php
+```
 
-When profiling is enabled, and once the program has reached a large memory usage,
-call ``memprof_dump_callgrind()`` or one it its variants to save the full
-profiling information to a file.
+For web scripts, we can set the `$_GET` variable:
 
-* Calling the function multiple times is not necessary
-* Waiting for a high memory usage before saving the profile makes it easier to
-  find a leak
+```
+curl http://127.0.0.1/test.php?MEMPROF_PROFILE=dump_on_limit
+```
 
-### 3. Visualizing the profile
+Or the `$_POST` variable:
+
+```
+curl -d MEMPROF_PROFILE=dump_on_limit http://127.0.0.1/test.php
+```
+
+> :information_source: The `memprof_enabled_flags()` function can be called to
+> check whether profiling is currently enabled in `dump_on_limit` mode.
+
+### Step 2: Dumping the profile
+
+In this mode, `memprof` will automatically save the profile if the program
+exceeds the memory limit (when PHP triggers an error like `Fatal error: Allowed
+memory size of 15728640 bytes exhausted (tried to allocate 1024 bytes)` error).
+
+By default, the profile is saved in a file named `memprof.callgrind.*` in `/tmp`
+or `C:\Windows\Temp`.
+
+### Step 3: Visualizing the profile
 
 The recommended way to visualize the result is to use Kcachegrind (on Linux) or Qcachegrind (on MacOS, Windows). Google Perftools are also supported. See the documentation of ``memprof_dump_callgrind()`` and variants.
 
@@ -100,35 +119,34 @@ Use Homebrew: https://formulae.brew.sh/formula/qcachegrind
 
 Download it from https://sourceforge.net/projects/qcachegrindwin/
 
-### Usage example
+## Advanced usage
 
-```
-<?php // test.php
+### Profile trigger
 
-do_some_work();
+Profiling is enabled at request startup when one of these is true:
 
-if (function_exists('memprof_enabled') && memprof_enabled()) {
-    memprof_dump_callgrind(fopen("/tmp/callgrind.out", "w"));
-}
-```
+ * The environment variable `MEMPROF_PROFILE` is non-empty
+ * `$_GET["MEMPROF_PROFILE"]` is non-empty
+ * `$_POST["MEMPROF_PROFILE"]` is non-empty
 
-When ran on the command line, profiling can be enabled by setting the `MEMPROF_PROFILE` environment variable:
+### Profile flags
 
-```
-MEMPROF_PROFILE=1 php test.php
-```
+The `MEMPROF_PROFILE` variable accepts a comma-separated list of flags.
 
-When ran in a web context, profiling can be enabled by setting the `MEMPROF_PROFILE` query string parameter or POST field:
+Examples of valid `MEMPROF_PROFILE` values:
 
-```
-curl http://127.0.0.1/test.php?MEMPROF_PROFILE=1
-```
+ * `1`: non-empty: profiling is enabled
+ * `dump_on_limit`: profiling is enabled, will dump on memory limit
+ * `native`: profiling is enabled, will profile native allocations
+ * `dump_on_limit,native`: profiling is enabled, will profile native allocations, will dump on memory limit
 
-Setting a POST field works as well:
+List of valid flags:
 
-```
-curl -d MEMPROF_PROFILE=1 http://127.0.0.1/test.php
-```
+ * `dump_on_limit`: Will dump the profile in callgrind format in `/tmp` or
+   `C:\Windows\Temp`. The output directory can be changed with the
+   `memprof.output_dir` ini setting.
+ * `native`: Will profile native `malloc()` allocations, not only PHP's (This is
+   not thread safe, see bellow).
 
 ### Profiling native allocations
 
@@ -154,7 +172,8 @@ Returns whether memory profiling is currently enabled (see above).
 
 ### memprof_enabled_flags()
 
-Returns whether memory profiling and native profiling are enabled (see above).
+Returns whether memory profiling and which profiling features are enabled (see
+above).
 
 ### memprof_dump_callgrind(resource $stream)
 
@@ -217,7 +236,8 @@ The array exposes the following information:
    multiple places, it is possible to see which call path caused it to leak the
    most memory
 
-Example output:
+<details>
+<summary>Example output</summary>
 
     Array
     (
@@ -285,6 +305,7 @@ Example output:
             )
         )
     )
+</details>
 
 ## Troubleshooting
 

@@ -8,9 +8,11 @@ var_dump(memprof_enabled());
 var_dump(memprof_enabled_flags());
 --EXPECT--
 bool(true)
-array(2) {
+array(3) {
   ["enabled"]=>
   bool(true)
   ["native"]=>
   bool(true)
+  ["dump_on_limit"]=>
+  bool(false)
 }
