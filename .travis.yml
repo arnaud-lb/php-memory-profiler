@@ -1,42 +1,37 @@
-dist: xenial
-lang: php
-compiler:
-    - gcc
-cache:
-    directories:
-        - /home/travis/.phpenv/
-env:
-    global:
-        - MEMPROF_CFLAGS='-Wall -Werror'
+# TravisCI configuration for arnaud-lb/php-memory-profiler
+
+if: "branch = v2"
+
+language: "php"
+os:
+    - "linux"
+dist: "bionic"
+
+addons:
+    apt:
+        packages:
+            - "libjudy-dev"
+            - "libonig-dev"
+            - "libzip-dev"
+
+php:
+    - "8.0"
+    - "7.4"
+    - "7.3"
+    - "7.2
+    - "7.1"
+
 jobs:
-    allow_failures:
-        - env: PHP_VERSION=8.0snapshot
     fast_finish: true
-    include:
-        - env: PHP_VERSION=8.0snapshot
-        - env: PHP_VERSION=7.4.12
-        - env: PHP_VERSION=7.3.24
-        - env: PHP_VERSION=7.2.19
-        - env: PHP_VERSION=7.1.33
 
 before_install:
-    - |
-        # Use a non-zts PHP build
-        set -e
-        sudo apt-get install libjudy-dev libonig-dev libzip-dev
-        if ! [ -f $HOME/.phpenv/memprof-travis-cached ]; then
-            echo "Building PHP"
-            git clone git://github.com/php-build/php-build.git $HOME/.phpenv/plugins/php-build
-            phpenv install --verbose --force $PHP_VERSION
-            rm -rf $HOME/.phpenv/plugins/php-build
-            touch $HOME/.phpenv/memprof-travis-cached
-        else
-            echo "PHP already built"
-        fi
-        phpenv rehash
-        phpenv global $PHP_VERSION
+    - "phpenv config-rm xdebug.ini"
 
 install:
-    - .travis/build.sh
+    - "phpize"
+    - "CFLAGS='-Wall -Werror' ./configure"
+    - "make"
+
 script:
-    - .travis/test.sh
+    - "php --ri memprof"
+    - "REPORT_EXIT_STATUS=1 TEST_PHP_EXECUTABLE=\"$(realpath \"$(which php)\")\" php run-tests.php -s -q --show-diff"
