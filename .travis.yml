@@ -30,14 +30,14 @@ cache:
 
 before_install:
     - |
-        # Using PHP ZTS
+        # Using PHP non-ZTS
         PHP_VERSION="$(php -r 'echo PHP_VERSION;')"
-        if ! [ -f "${HOME}/.phpenv/php-zts-built" ]; then
+        if ! [ -f "${HOME}/.phpenv/php-non-zts-built" ]; then
             echo "Building PHP ZTS ${PHP_VERSION} ..."
             git clone git://github.com/php-build/php-build.git "${HOME}/.phpenv/plugins/php-build"
             phpenv install --verbose --force "${PHP_VERSION}"
             rm -rf "${HOME}/.phpenv/plugins/php-build"
-            touch "${HOME}/.phpenv/php-zts-built"
+            touch "${HOME}/.phpenv/php-non-zts-built"
         fi
         phpenv rehash
         phpenv global "${PHP_VERSION}"
@@ -47,7 +47,9 @@ before_install:
 install:
     - "phpize"
     - "CFLAGS=\"-Wall -Werror\" ./configure"
-    - "make"
+    - "make -j \"$(nproc)\""
+    - "echo \"extension = $(realpath modules/memprof.so)\" >modules/memprof.ini"
+    - "phpenv config-add modules/memprof.ini"
 
 script:
     - "php --ri memprof"
