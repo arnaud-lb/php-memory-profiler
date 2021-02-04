@@ -24,8 +24,25 @@ php:
 jobs:
     fast_finish: true
 
+cache:
+    directories:
+        - "${HOME}/.phpenv/"
+
 before_install:
-    - "phpenv config-rm xdebug.ini"
+    - |
+        # Using PHP ZTS
+        PHP_VERSION="$(php -r 'echo PHP_VERSION;')"
+        if ! [ -f "${HOME}/.phpenv/php-zts-built" ]; then
+            echo "Building PHP ZTS ${PHP_VERSION} ..."
+            git clone git://github.com/php-build/php-build.git "${HOME}/.phpenv/plugins/php-build"
+            phpenv install --verbose --force "${PHP_VERSION}"
+            rm -rf "${HOME}/.phpenv/plugins/php-build"
+            touch "${HOME}/.phpenv/php-zts-built"
+        fi
+        phpenv rehash
+        phpenv global "${PHP_VERSION}"
+        phpenv config-rm xdebug.ini
+        php -v
 
 install:
     - "phpize"
