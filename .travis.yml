@@ -47,7 +47,7 @@ before_install:
 install:
     - "phpize"
     - "CFLAGS=\"-Wall -Werror\" ./configure"
-    - "make -j \"$(nproc)\""
+    - "make"
     - "echo \"extension = $(realpath modules/memprof.so)\" >modules/memprof.ini"
     - "phpenv config-add modules/memprof.ini"
 
