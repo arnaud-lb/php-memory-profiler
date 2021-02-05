@@ -51,29 +51,51 @@ Or permanently, in php.ini:
 
 The extension has no overhead when not profiling, so it can be loaded by default on dev environments.
 
-## Usage
+## Usage example
 
-Using the extension is done in three steps:
+The simplest way to use `memprof` is to let it save the memory profile when the
+program's memory limit is exceeded.
 
-### 1. Enabling profile
+### Step 1: Enable profiling in `dump_on_limit` mode
 
-Profiling is enabled at request startup when one of these is true:
+Profiling in `dump_on_limit` mode is enabled at request startup when one
+of these is true:
 
- * The environment variable `MEMPROF_PROFILE` is non-empty
- * `$_GET["MEMPROF_PROFILE"]` is non-empty
- * `$_POST["MEMPROF_PROFILE"]` is non-empty
+ * The environment variable `MEMPROF_PROFILE` is equal to `dump_on_limit`
+ * `$_GET["MEMPROF_PROFILE"]` is equal to `dump_on_limit`
+ * `$_POST["MEMPROF_PROFILE"]` is equal to `dump_on_limit`
 
-### 2. Dumping the profile
+For command line scripts, we can set the environment variable:
 
-Once profiling is enabled, the program must call ``memprof_dump_callgrind()`` or
-one it its variants to dump the memory profile.
+```
+MEMPROF_PROFILE=dump_on_limit php test.php
+```
 
-This can be done at anytime during the program, ideally when the leak is large,
-so that it will be more visible in the profile.
+For web scripts, we can set the `$_GET` variable:
 
-This can be done multiple times during the same execution, but this is not necessary.
+```
+curl http://127.0.0.1/test.php?MEMPROF_PROFILE=dump_on_limit
+```
 
-### 3. Visualizing the profile
+Or the `$_POST` variable:
+
+```
+curl -d MEMPROF_PROFILE=dump_on_limit http://127.0.0.1/test.php
+```
+
+> :information_source: The `memprof_enabled_flags()` function can be called to
+> check whether profiling is currently enabled in `dump_on_limit` mode.
+
+### Step 2: Dumping the profile
+
+In this mode, `memprof` will automatically save the profile if the program
+exceeds the memory limit (when PHP triggers an error like `Fatal error: Allowed
+memory size of 15728640 bytes exhausted (tried to allocate 1024 bytes)` error).
+
+By default, the profile is saved in a file named `memprof.callgrind.*` in `/tmp`
+or `C:\Windows\Temp`.
+
+### Step 3: Visualizing the profile
 
 The recommended way to visualize the result is to use Kcachegrind (on Linux) or Qcachegrind (on MacOS, Windows). Google Perftools are also supported. See the documentation of ``memprof_dump_callgrind()`` and variants.
 
@@ -97,41 +119,61 @@ Use Homebrew: https://formulae.brew.sh/formula/qcachegrind
 
 Download it from https://sourceforge.net/projects/qcachegrindwin/
 
-### Usage example
+## Advanced usage
 
-```
-<?php // test.php
+### Profile trigger
 
-do_some_work();
+Profiling is enabled at request startup when one of these is true:
 
-if (function_exists('memprof_enabled') && memprof_enabled()) {
-    memprof_dump_callgrind(fopen("/tmp/callgrind.out", "w"));
-}
-```
+ * The environment variable `MEMPROF_PROFILE` is non-empty
+ * `$_GET["MEMPROF_PROFILE"]` is non-empty
+ * `$_POST["MEMPROF_PROFILE"]` is non-empty
 
-When ran on the command line, profiling can be enabled by setting the `MEMPROF_PROFILE` environment variable:
+### Profile flags
 
-```
-MEMPROF_PROFILE=1 php test.php
-```
+The `MEMPROF_PROFILE` variable accepts a comma-separated list of flags.
 
-When ran in a web context, profiling can be enabled by setting the `MEMPROF_PROFILE` query string parameter or POST field:
+Examples of valid `MEMPROF_PROFILE` values:
 
-```
-curl http://127.0.0.1/test.php?MEMPROF_PROFILE=1
-```
+ * `1`: non-empty: profiling is enabled
+ * `dump_on_limit`: profiling is enabled, will dump on memory limit
+ * `native`: profiling is enabled, will profile native allocations
+ * `dump_on_limit,native`: profiling is enabled, will profile native allocations, will dump on memory limit
 
-Setting a POST field works as well:
+List of valid flags:
 
-```
-curl -d MEMPROF_PROFILE=1 http://127.0.0.1/test.php
-```
+ * `dump_on_limit`: Will dump the profile in callgrind format in `/tmp` or
+   `C:\Windows\Temp`. The output directory can be changed with the
+   `memprof.output_dir` ini setting.
+ * `native`: Will profile native `malloc()` allocations, not only PHP's (This is
+   not thread safe, see bellow).
+
+### Profiling native allocations
+
+Memprof doesn't track native allocations by default, but this can be enabled
+by setting `MEMPROF_PROFILE` to `native`.
+
+Native allocations are the allocations made outside of PHP's own memory
+allocator. Typically, external libraries such as libxml2 (used in the DOM
+extension) make native allocations. PHP can also make native allocations for
+persistent resources.
+
+Enabling native allocation tracking will profile these allocations in addition
+to PHP's own allocations.
+
+Note that when native tracking is enabled, the program will crash if a native
+library uses threads, because the underlying hooks are not thread safe.
 
 ## Functions documentation
 
 ### memprof_enabled()
 
 Returns whether memory profiling is currently enabled (see above).
+
+### memprof_enabled_flags()
+
+Returns whether memory profiling and which profiling features are enabled (see
+above).
 
 ### memprof_dump_callgrind(resource $stream)
 
@@ -194,7 +236,8 @@ The array exposes the following information:
    multiple places, it is possible to see which call path caused it to leak the
    most memory
 
-Example output:
+<details>
+<summary>Example output</summary>
 
     Array
     (
@@ -262,10 +305,10 @@ Example output:
             )
         )
     )
+</details>
 
 ## Troubleshooting
 
- * If you are experiencing crashes, try disabling malloc hooks by setting HAVE_MALLOC_HOOKS to 0 in config.h after running configure; then run ``make clean && make && make install``. (Using malloc hooks may crash if some other extension uses threads internally.)
  * The extensions may conflict with xdebug, blackfire, or other extensions. If that's the case for you, please report it.
 
 ## PHP versions
@@ -273,10 +316,6 @@ Example output:
 The current branch supports PHP 7.1 to PHP 8.
 
 The php5 branch supports PHP 5.
-
-## TODO
-
- * Thread-safe malloc hooks
 
 ## How it works
 
