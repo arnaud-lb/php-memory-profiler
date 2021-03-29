@@ -1,4 +1,8 @@
-# php-memprof
+<p align="center">
+    <img src="https://i.imgur.com/NHLeua6.png" alt="memprof logo" width="330" height="330" />
+</p>
+
+# memprof
 
 ![Supported PHP versions: 7.1 ... 8.x](https://img.shields.io/badge/php-7.1%20...%208.x-blue.svg) [![Build Status](https://travis-ci.com/arnaud-lb/php-memory-profiler.svg?branch=v2)](https://travis-ci.com/arnaud-lb/php-memory-profiler)
 
