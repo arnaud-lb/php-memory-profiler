@@ -70,6 +70,7 @@ if test "$PHP_MEMPROF" != "no"; then
     AC_DEFINE([HAVE_MALLOC_HOOKS], 1, [Define to 1 if libc supports malloc hooks])
     AC_MSG_RESULT(yes)
   ],[
+    AC_DEFINE([HAVE_MALLOC_HOOKS], 0, [Define to 1 if libc supports malloc hooks])
     AC_MSG_RESULT(no)
   ])
 
