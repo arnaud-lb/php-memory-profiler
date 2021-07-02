@@ -196,14 +196,17 @@ static void (*old_zend_execute)(zend_execute_data *execute_data);
 static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, zval *return_value);
 #define zend_execute_fn zend_execute_ex
 
-#if ZEND_MODULE_API_NO < 20170718 /* PHP 7.1 - 7.2 */
+#if   PHP_VERSION_ID < 70200 /* PHP 7.1 */
 static void (*old_zend_error_cb)(int type, const char *error_filename, const uint error_lineno, const char *format, va_list args);
 #define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, format, args
-#elif ZEND_MODULE_API_NO < 20200930 /* PHP 7.3 - 7.4 */
+#elif PHP_VERSION_ID < 80000 /* PHP 7.2 - 7.4 */
 static void (*old_zend_error_cb)(int type, const char *error_filename, const uint32_t error_lineno, const char *format, va_list args);
 #define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, format, args
-#else /* PHP 8 */
+#elif PHP_VERSION_ID < 80100 /* PHP 8.0 */
 static void (*old_zend_error_cb)(int type, const char *error_filename, const uint32_t error_lineno, zend_string *message);
+#define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, message
+#else                        /* PHP 8.1 */
+static void (*old_zend_error_cb)(int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message);
 #define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, message
 #endif
 
@@ -764,17 +767,19 @@ static char * generate_filename(const char * format) {
 	return filename;
 }
 
-#if ZEND_MODULE_API_NO < 20170718 /* PHP 7.1 - 7.2 */
+#if   PHP_VERSION_ID < 70200 /* PHP 7.1 */
 static void memprof_zend_error_cb(int type, const char *error_filename, const uint error_lineno, const char *format, va_list args)
-#elif ZEND_MODULE_API_NO < 20200930 /* PHP 7.3 - 7.4 */
+#elif PHP_VERSION_ID < 80000 /* PHP 7.2 - 7.4 */
 static void memprof_zend_error_cb(int type, const char *error_filename, const uint32_t error_lineno, const char *format, va_list args)
-#else /* PHP 8 */
+#elif PHP_VERSION_ID < 80100 /* PHP 8.0 */
 static void memprof_zend_error_cb(int type, const char *error_filename, const uint32_t error_lineno, zend_string *message)
+#else                        /* PHP 8.1 */
+static void memprof_zend_error_cb(int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message)
 #endif
 {
 	char * filename;
 	php_stream * stream;
-#if ZEND_MODULE_API_NO < 20200930
+#if PHP_VERSION_ID < 80000
 	const char * msg = format;
 #else
 	const char * msg = ZSTR_VAL(message);
