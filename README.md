@@ -25,14 +25,19 @@ installed with:
 
     # install libjudy dependency:
     apt install libjudy-dev
+    
+On MacOS the dependency can be installed with:
 
-### Using PECL
+    # install libjudy dependency:
+    brew install traildb/judy/judy
+
+### Installing with PECL
 
 Make sure to install [dependencies](#dependencies), and then:
 
     pecl install memprof
 
-### Manually
+### Installing manually
 
 Make sure to install [dependencies](#dependencies), and then:
 
