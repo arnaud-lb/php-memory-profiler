@@ -748,7 +748,7 @@ static zend_bool should_autodump(int error_type, const char *message) {
 static char * generate_filename(const char * format) {
 	char * filename;
 	struct timeval tv;
-	int64_t ts;
+	uint64_t ts;
 	const char * output_dir = MEMPROF_G(output_dir);
 	char slash[] = "\0";
 
@@ -759,7 +759,7 @@ static char * generate_filename(const char * format) {
 		slash[0] = DEFAULT_SLASH;
 	}
 
-	spprintf(&filename, 0, "%s%smemprof.%s.%lld", output_dir, slash, format, (long long) ts);
+	spprintf(&filename, 0, "%s%smemprof.%s.%" PRIu64, output_dir, slash, format,  ts);
 
 	return filename;
 }
