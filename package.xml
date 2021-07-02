@@ -13,7 +13,7 @@
  <date>2021-03-29</date>
  <time>12:00:00</time>
  <version>
-  <release>3.0.0</release>
+  <release>3.0.1</release>
   <api>1.0.0</api>
  </version>
  <stability>
@@ -22,8 +22,7 @@
  </stability>
  <license>BSD</license>
  <notes>
-  * Added ability to dump profile when the memory limit is exceeded
-  * Profiling of non-php allocations is disabled by default (can be enabled at runtime)
+  * Fix build
  </notes>
  <contents>
   <dir name="/">
@@ -63,6 +62,23 @@
  <providesextension>memprof</providesextension>
  <extsrcrelease />
  <changelog>
+  <release>
+   <date>2021-03-29</date>
+   <time>12:00:00</time>
+   <version>
+    <release>3.0.0</release>
+    <api>1.0.0</api>
+   </version>
+   <stability>
+    <release>stable</release>
+    <api>stable</api>
+   </stability>
+   <license>BSD</license>
+   <notes>
+    * Added ability to dump profile when the memory limit is exceeded
+    * Profiling of non-php allocations is disabled by default (can be enabled at runtime)
+   </notes>
+  </release>
   <release>
    <date>2020-11-19</date>
    <time>12:00:00</time>
