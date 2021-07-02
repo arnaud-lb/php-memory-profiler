@@ -1,0 +1,56 @@
+name: 'Tests'
+
+on:
+    push:
+        branches:
+            - master
+    pull_request:
+
+jobs:
+    tests:
+        name: 'Tests'
+        strategy:
+          matrix:
+            include:
+              - php: '8.0.0'
+                os: 'ubuntu-20.04'
+                expect_native: 1
+                werror: 1
+
+              - php: '8.0.0'
+                os: 'macos-10.15'
+
+              - php: '7.4.0'
+                os: 'ubuntu-20.04'
+                expect_native: 1
+
+              - php: '7.3.0'
+                os: 'ubuntu-20.04'
+                expect_native: 1
+
+        runs-on: ${{ matrix.os }}
+        continue-on-error: ${{ !!matrix.experimental }}
+        env:
+            PHP_VERSION: ${{ matrix.php }}
+            MEMORY_CHECK: ${{ matrix.memcheck }}
+            WERROR: ${{ matrix.werror }}
+            MEMPROF_EXPECT_NATIVE_TRACKING: ${{ matrix.expect_native }}
+        steps:
+            - name: 'Check out repository'
+              uses: 'actions/checkout@v2'
+              with:
+                  path: 'ext'
+
+            - uses: actions/cache@v2
+              with:
+                  path: ~/build-cache/php
+                  key: ${{ runner.os }}-${{ matrix.php }}-${{ matrix.memcheck }}
+
+            - name: 'Build PHP'
+              run: './ext/.github/workflows/test/build-php.sh'
+
+            - name: 'Build extension'
+              run: './ext/.github/workflows/test/build-extension.sh'
+
+            - name: 'Run tests'
+              run: './ext/.github/workflows/test/tests.sh'

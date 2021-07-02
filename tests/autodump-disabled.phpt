@@ -29,7 +29,7 @@ function f() {
 
 f();
 --EXPECTF--
-string(%d) "/tmp/%s"
+string(%d) "/%s"
 bool(true)
 array(3) {
   ["enabled"]=>
