@@ -28,6 +28,9 @@
   <dir name="/">
    <file name="config.m4" role="src" />
    <file name="memprof.c" role="src" />
+   <file name="memprof.stub.php" role="src" />
+   <file name="memprof_arginfo.h" role="src" />
+   <file name="memprof_legacy_arginfo.h" role="src" />
    <file name="php_memprof.h" role="src" />
    <file name="util.c" role="src" />
    <file name="util.h" role="src" />
