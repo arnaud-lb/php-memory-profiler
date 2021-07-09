@@ -32,6 +32,12 @@
 #endif
 #include <assert.h>
 
+#if PHP_VERSION_ID < 80000
+#include "memprof_legacy_arginfo.h"
+#else
+#include "memprof_arginfo.h"
+#endif
+
 #define MEMPROF_ENV_PROFILE "MEMPROF_PROFILE"
 #define MEMPROF_FLAG_NATIVE "native"
 #define MEMPROF_FLAG_DUMP_ON_LIMIT "dump_on_limit"
@@ -1027,34 +1033,9 @@ ZEND_DLEXPORT zend_extension zend_extension_entry = {
 	STANDARD_ZEND_EXTENSION_PROPERTIES
 };
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memprof_dump_callgrind, 0, 0, 1)
-	ZEND_ARG_INFO(0, handle)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memprof_dump_pprof, 0, 0, 1)
-	ZEND_ARG_INFO(0, handle)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_void, 0, 0, 0)
-ZEND_END_ARG_INFO()
-
 ZEND_BEGIN_ARG_INFO_EX(arginfo_memprof_memory_get_usage, 0, 0, 0)
 	ZEND_ARG_INFO(0, real)
 ZEND_END_ARG_INFO()
-
-/* {{{ memprof_functions[]
- */
-const zend_function_entry memprof_functions[] = {
-	PHP_FE(memprof_enabled, arginfo_void)
-	PHP_FE(memprof_enabled_flags, arginfo_void)
-	PHP_FE(memprof_enable, arginfo_void)
-	PHP_FE(memprof_disable, arginfo_void)
-	PHP_FE(memprof_dump_array, arginfo_void)
-	PHP_FE(memprof_dump_callgrind, arginfo_memprof_dump_callgrind)
-	PHP_FE(memprof_dump_pprof, arginfo_memprof_dump_pprof)
-	PHP_FE_END    /* Must be the last line in memprof_functions[] */
-};
-/* }}} */
 
 /* {{{ memprof_functions_overrides[]
  */
@@ -1070,7 +1051,7 @@ const zend_function_entry memprof_function_overrides[] = {
 zend_module_entry memprof_module_entry = {
 	STANDARD_MODULE_HEADER,
 	MEMPROF_NAME,
-	memprof_functions,
+	ext_functions,
 	PHP_MINIT(memprof),
 	PHP_MSHUTDOWN(memprof),
 	PHP_RINIT(memprof),
