@@ -12,18 +12,16 @@ jobs:
         strategy:
           matrix:
             include:
-              - php: '8.1.0alpha2'
-                tag: 'php-8.1.0alpha2'
-                os: 'ubuntu-20.04'
-                expect_native: 1
-                experimental: 1
-
-              - php: '8.0.0'
+              - php: '8.1.0'
                 os: 'ubuntu-20.04'
                 expect_native: 1
                 werror: 1
 
               - php: '8.0.0'
+                os: 'ubuntu-20.04'
+                expect_native: 1
+
+              - php: '8.1.0'
                 os: 'macos-10.15'
 
               - php: '7.4.0'
