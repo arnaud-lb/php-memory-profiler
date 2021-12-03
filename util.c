@@ -15,24 +15,27 @@
 #include "php.h"
 #include <stdarg.h>
 
-void stream_printf(php_stream * stream, const char * format, ...)
+zend_bool stream_printf(php_stream * stream, const char * format, ...)
 {
 	char * buf;
 	va_list ap;
 	int len;
+	zend_bool result;
 
 	va_start(ap, format);
 	len = vspprintf(&buf, 0, format, ap);
 	va_end(ap);
 
-	php_stream_write(stream, buf, len);
+	result = php_stream_write(stream, buf, len) == len;
 
 	efree(buf);
+
+	return result;
 }
 
-void stream_write_word(php_stream * stream, zend_uintptr_t word)
+zend_bool stream_write_word(php_stream * stream, zend_uintptr_t word)
 {
-	php_stream_write(stream, (char*) &word, sizeof(word));
+	return php_stream_write(stream, (char*) &word, sizeof(word)) == sizeof(word);
 }
 
 size_t get_function_name(zend_execute_data * execute_data, char * buf, size_t buf_size)

@@ -40,7 +40,7 @@ array(3) {
   bool(true)
 }
 
-Fatal error: Allowed memory size of 15728640 bytes exhausted%S (tried to allocate %d bytes) in %s on line%a
+Fatal error: Allowed memory size of 15728640 bytes exhausted%S (tried to allocate %d bytes) (memprof dumped to %smemprof.callgrind%s) in %s on line%a
 array(3) {
   [0]=>
   string(1) "."
