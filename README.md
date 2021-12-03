@@ -316,6 +316,10 @@ The array exposes the following information:
     )
 </details>
 
+### memprof_version()
+
+Returns the version of the extension as a string. The version can be compared with [version_compare()](https://php.net/version_compare).
+
 ## Troubleshooting
 
  * The extensions may conflict with xdebug, blackfire, or other extensions. If that's the case for you, please report it.
