@@ -1801,3 +1801,15 @@ PHP_FUNCTION(memprof_enabled_flags)
 	add_assoc_bool(return_value, "dump_on_limit", MEMPROF_G(profile_flags).dump_on_limit);
 }
 /* }}} */
+
+/* {{{ proto string memprof_version()
+   Returns memprof version as a string */
+PHP_FUNCTION(memprof_version)
+{
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "") == FAILURE) {
+		return;
+	}
+
+	RETURN_STRING(PHP_MEMPROF_VERSION);
+}
+/* }}} */
