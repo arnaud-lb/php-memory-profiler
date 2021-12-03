@@ -1,5 +1,5 @@
 /* This is a generated file, edit the .stub.php file instead.
- * Stub hash: 2ccb0e0939a9f13919125dd80717932d2737a359 */
+ * Stub hash: afb43b76aec85442c7267aba0b45bfd00d5c8cf1 */
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_memprof_enabled, 0, 0, 0)
 ZEND_END_ARG_INFO()
@@ -18,6 +18,8 @@ ZEND_END_ARG_INFO()
 
 #define arginfo_memprof_dump_pprof arginfo_memprof_dump_callgrind
 
+#define arginfo_memprof_version arginfo_memprof_enabled
+
 
 ZEND_FUNCTION(memprof_enabled);
 ZEND_FUNCTION(memprof_enabled_flags);
@@ -26,6 +28,7 @@ ZEND_FUNCTION(memprof_disable);
 ZEND_FUNCTION(memprof_dump_array);
 ZEND_FUNCTION(memprof_dump_callgrind);
 ZEND_FUNCTION(memprof_dump_pprof);
+ZEND_FUNCTION(memprof_version);
 
 
 static const zend_function_entry ext_functions[] = {
@@ -36,5 +39,6 @@ static const zend_function_entry ext_functions[] = {
 	ZEND_FE(memprof_dump_array, arginfo_memprof_dump_array)
 	ZEND_FE(memprof_dump_callgrind, arginfo_memprof_dump_callgrind)
 	ZEND_FE(memprof_dump_pprof, arginfo_memprof_dump_pprof)
+	ZEND_FE(memprof_version, arginfo_memprof_version)
 	ZEND_FE_END
 };
