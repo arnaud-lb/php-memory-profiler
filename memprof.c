@@ -177,8 +177,8 @@ typedef struct _alloc_buckets {
 	alloc_bucket_item ** buckets;
 } alloc_buckets;
 
-static void dump_callgrind(php_stream * stream);
-static void dump_pprof(php_stream * stream);
+static zend_bool dump_callgrind(php_stream * stream);
+static zend_bool dump_pprof(php_stream * stream);
 
 static ZEND_DECLARE_MODULE_GLOBALS(memprof)
 
@@ -203,18 +203,20 @@ static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, zv
 #define zend_execute_fn zend_execute_ex
 
 #if   PHP_VERSION_ID < 70200 /* PHP 7.1 */
-static void (*old_zend_error_cb)(int type, const char *error_filename, const uint error_lineno, const char *format, va_list args);
-#define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, format, args
+#	define MEMPROF_ZEND_ERROR_CB_ARGS int type, const char *error_filename, const uint error_lineno, const char *format, va_list args
+#	define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, format, args
 #elif PHP_VERSION_ID < 80000 /* PHP 7.2 - 7.4 */
-static void (*old_zend_error_cb)(int type, const char *error_filename, const uint32_t error_lineno, const char *format, va_list args);
-#define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, format, args
+#	define MEMPROF_ZEND_ERROR_CB_ARGS int type, const char *error_filename, const uint32_t error_lineno, const char *format, va_list args
+#	define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, format, args
 #elif PHP_VERSION_ID < 80100 /* PHP 8.0 */
-static void (*old_zend_error_cb)(int type, const char *error_filename, const uint32_t error_lineno, zend_string *message);
-#define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, message
+#	define MEMPROF_ZEND_ERROR_CB_ARGS int type, const char *error_filename, const uint32_t error_lineno, zend_string *message
+#	define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, message
 #else                        /* PHP 8.1 */
-static void (*old_zend_error_cb)(int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message);
-#define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, message
+#	define MEMPROF_ZEND_ERROR_CB_ARGS int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message
+#	define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, message
 #endif
+
+static void (*old_zend_error_cb)(MEMPROF_ZEND_ERROR_CB_ARGS);
 
 static PHP_INI_MH((*origOnChangeMemoryLimit)) = NULL;
 
@@ -810,33 +812,17 @@ static char * generate_filename(const char * format) {
 	return filename;
 }
 
-#if   PHP_VERSION_ID < 70200 /* PHP 7.1 */
-static void memprof_zend_error_cb(int type, const char *error_filename, const uint error_lineno, const char *format, va_list args)
-#elif PHP_VERSION_ID < 80000 /* PHP 7.2 - 7.4 */
-static void memprof_zend_error_cb(int type, const char *error_filename, const uint32_t error_lineno, const char *format, va_list args)
-#elif PHP_VERSION_ID < 80100 /* PHP 8.0 */
-static void memprof_zend_error_cb(int type, const char *error_filename, const uint32_t error_lineno, zend_string *message)
-#else                        /* PHP 8.1 */
-static void memprof_zend_error_cb(int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message)
-#endif
+static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
 {
-	char * filename;
+	char * filename = NULL;
 	php_stream * stream;
+	zend_bool error = 0;
 #if PHP_VERSION_ID < 80000
-	const char * msg = format;
+	const char * message_chr = format;
 #else
-	const char * msg = ZSTR_VAL(message);
+	const char * message_chr = ZSTR_VAL(message);
 #endif
-
-	if (EXPECTED(!MEMPROF_G(profile_flags).enabled)) {
-		old_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
-		return;
-	}
-
-	if (EXPECTED(!should_autodump(type, msg))) {
-		old_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
-		return;
-	}
+	zend_string * new_message = NULL;
 
 	zend_mm_set_heap(orig_zheap);
 	zend_set_memory_limit((size_t)Z_L(-1) >> (size_t)Z_L(1));
@@ -847,18 +833,36 @@ static void memprof_zend_error_cb(int type, zend_string *error_filename, const u
 			filename = generate_filename("callgrind");
 			stream = php_stream_open_wrapper_ex(filename, "w", 0, NULL, NULL);
 			if (stream != NULL) {
-				dump_callgrind(stream);
+				error = !dump_callgrind(stream);
+				php_stream_free(stream, PHP_STREAM_FREE_CLOSE);
+			} else {
+				error = 1;
 			}
-			php_stream_free(stream, PHP_STREAM_FREE_CLOSE);
-			efree(filename);
 		} else if (MEMPROF_G(output_format) == FORMAT_PPROF) {
-			filename = generate_filename("callgrind");
+			filename = generate_filename("pprof");
 			stream = php_stream_open_wrapper_ex(filename, "w", 0, NULL, NULL);
 			if (stream != NULL) {
-				dump_pprof(stream);
+				error = !dump_pprof(stream);
+				php_stream_free(stream, PHP_STREAM_FREE_CLOSE);
+			} else {
+				error = 1;
 			}
-			php_stream_free(stream, PHP_STREAM_FREE_CLOSE);
-			efree(filename);
+		}
+
+		if (filename != NULL) {
+			if (error == 0) {
+				new_message = strpprintf(0, "%s (memprof dumped to %s)", message_chr, filename);
+			} else {
+				new_message = strpprintf(0, "%s (memprof failed dumping to %s, please check file permissions or disk capacity)", message_chr, filename);
+			}
+		}
+
+		if (new_message != NULL) {
+#if PHP_VERSION_ID < 80000
+			format = ZSTR_VAL(new_message);
+#else
+			message = new_message;
+#endif
 		}
 	} END_WITHOUT_MALLOC_TRACKING;
 
@@ -867,6 +871,37 @@ static void memprof_zend_error_cb(int type, zend_string *error_filename, const u
 	zend_mm_set_heap(zheap);
 
 	old_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
+
+	WITHOUT_MALLOC_TRACKING {
+		if (filename != NULL) {
+			free(filename);
+		}
+		if (new_message != NULL) {
+			zend_string_free(new_message);
+		}
+	} END_WITHOUT_MALLOC_TRACKING;
+
+}
+
+static void memprof_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS)
+{
+#if PHP_VERSION_ID < 80000
+	const char * message_chr = format;
+#else
+	const char * message_chr = ZSTR_VAL(message);
+#endif
+
+	if (EXPECTED(!MEMPROF_G(profile_flags).enabled)) {
+		old_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
+		return;
+	}
+
+	if (EXPECTED(!should_autodump(type, message_chr))) {
+		old_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
+		return;
+	}
+
+	return memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
 }
 
 static PHP_INI_MH(OnChangeMemoryLimit)
@@ -1275,7 +1310,7 @@ static void frame_inclusive_cost(frame * f, size_t * inclusive_size, size_t * in
 	*inclusive_count = count;
 }
 
-static void dump_frame_array(zval * dest, frame * f)
+static zend_bool dump_frame_array(zval * dest, frame * f)
 {
 	HashPosition pos;
 	zval * znext;
@@ -1324,9 +1359,11 @@ static void dump_frame_array(zval * dest, frame * f)
 	}
 
 	add_assoc_zval_ex(zframe, ZEND_STRL("called_functions"), &zcalled_functions);
+
+	return 1;
 }
 
-static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, size_t * inclusive_size, size_t * inclusive_count)
+static zend_bool dump_frame_callgrind(php_stream * stream, frame * f, char * fname, size_t * inclusive_size, size_t * inclusive_count)
 {
 	size_t size = 0;
 	size_t count = 0;
@@ -1348,7 +1385,9 @@ static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, s
 			continue;
 		}
 
-		dump_frame_callgrind(stream, next, ZSTR_VAL(str_key), &call_size, &call_count);
+		if (!dump_frame_callgrind(stream, next, ZSTR_VAL(str_key), &call_size, &call_count)) {
+			return 0;
+		}
 
 		size += call_size;
 		count += call_count;
@@ -1356,8 +1395,12 @@ static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, s
 		zend_hash_move_forward_ex(&f->next_cache, &pos);
 	}
 
-	stream_printf(stream, "fl=/todo.php\n");
-	stream_printf(stream, "fn=%s\n", fname);
+	if (
+		!stream_printf(stream, "fl=/todo.php\n") ||
+		!stream_printf(stream, "fn=%s\n", fname)
+	) {
+		return 0;
+	}
 
 	LIST_FOREACH(alloc, &f->allocs, list) {
 		self_size += alloc->size;
@@ -1366,7 +1409,9 @@ static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, s
 	size += self_size;
 	count += self_count;
 
-	stream_printf(stream, "1 %zu %zu\n", self_size, self_count);
+	if (!stream_printf(stream, "1 %zu %zu\n", self_size, self_count)) {
+		return 0;
+	}
 
 	zend_hash_internal_pointer_reset_ex(&f->next_cache, &pos);
 	while ((znext = zend_hash_get_current_data_ex(&f->next_cache, &pos)) != NULL) {
@@ -1382,15 +1427,21 @@ static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, s
 
 		frame_inclusive_cost(next, &call_size, &call_count);
 
-		stream_printf(stream, "cfl=/todo.php\n");
-		stream_printf(stream, "cfn=%s\n", ZSTR_VAL(str_key));
-		stream_printf(stream, "calls=%zu 1\n", next->calls);
-		stream_printf(stream, "1 %zu %zu\n", call_size, call_count);
+		if (
+			!stream_printf(stream, "cfl=/todo.php\n")						||
+			!stream_printf(stream, "cfn=%s\n", ZSTR_VAL(str_key))			||
+			!stream_printf(stream, "calls=%zu 1\n", next->calls)			||
+			!stream_printf(stream, "1 %zu %zu\n", call_size, call_count)
+		) {
+			return 0;
+		}
 
 		zend_hash_move_forward_ex(&f->next_cache, &pos);
 	}
 
-	stream_printf(stream, "\n");
+	if (!stream_printf(stream, "\n")) {
+		return 0;
+	}
 
 	if (inclusive_size) {
 		*inclusive_size = size;
@@ -1398,24 +1449,28 @@ static void dump_frame_callgrind(php_stream * stream, frame * f, char * fname, s
 	if (inclusive_count) {
 		*inclusive_count = count;
 	}
+
+	return 1;
 }
 
-static void dump_callgrind(php_stream * stream) {
+static zend_bool dump_callgrind(php_stream * stream) {
 	size_t total_size;
 	size_t total_count;
 
-	stream_printf(stream, "version: 1\n");
-	stream_printf(stream, "cmd: unknown\n");
-	stream_printf(stream, "positions: line\n");
-	stream_printf(stream, "events: MemorySize BlocksCount\n");
-	stream_printf(stream, "\n");
+	return (
+		stream_printf(stream, "version: 1\n")						&&
+		stream_printf(stream, "cmd: unknown\n")						&&
+		stream_printf(stream, "positions: line\n")					&&
+		stream_printf(stream, "events: MemorySize BlocksCount\n")	&&
+		stream_printf(stream, "\n")									&&
 
-	dump_frame_callgrind(stream, &root_frame, "root", &total_size, &total_count);
+		dump_frame_callgrind(stream, &root_frame, "root", &total_size, &total_count) &&
 
-	stream_printf(stream, "total: %zu %zu\n", total_size, total_count);
+		stream_printf(stream, "total: %zu %zu\n", total_size, total_count)
+	);
 }
 
-static void dump_frames_pprof(php_stream * stream, HashTable * symbols, frame * f)
+static zend_bool dump_frames_pprof(php_stream * stream, HashTable * symbols, frame * f)
 {
 	HashPosition pos;
 	frame * prev;
@@ -1433,9 +1488,11 @@ static void dump_frames_pprof(php_stream * stream, HashTable * symbols, frame * 
 			if (symaddr == 0) {
 				/* shouldn't happen */
 				zend_error(E_CORE_ERROR, "symbol address not found");
-				return;
+				return 0;
 			}
-			stream_write_word(stream, symaddr);
+			if (!stream_write_word(stream, symaddr)) {
+				return 0;
+			}
 		}
 	}
 
@@ -1449,13 +1506,17 @@ static void dump_frames_pprof(php_stream * stream, HashTable * symbols, frame * 
 			continue;
 		}
 
-		dump_frames_pprof(stream, symbols, next);
+		if (!dump_frames_pprof(stream, symbols, next)) {
+			return 0;
+		}
 
 		zend_hash_move_forward_ex(&f->next_cache, &pos);
 	}
+
+	return 1;
 }
 
-static void dump_frames_pprof_symbols(php_stream * stream, HashTable * symbols, frame * f)
+static zend_bool dump_frames_pprof_symbols(php_stream * stream, HashTable * symbols, frame * f)
 {
 	HashPosition pos;
 	zval * znext;
@@ -1465,7 +1526,9 @@ static void dump_frames_pprof_symbols(php_stream * stream, HashTable * symbols, 
 		/* addr only has to be unique */
 		symaddr = (symbols->nNumOfElements+1)<<3;
 		zend_hash_str_add_ptr(symbols, f->name, f->name_len, (void*) symaddr);
-		stream_printf(stream, "0x%0*x %s\n", sizeof(symaddr)*2, symaddr, f->name);
+		if (!stream_printf(stream, "0x%0*x %s\n", sizeof(symaddr)*2, symaddr, f->name)) {
+			return 0;
+		}
 	}
 
 	zend_hash_internal_pointer_reset_ex(&f->next_cache, &pos);
@@ -1478,47 +1541,71 @@ static void dump_frames_pprof_symbols(php_stream * stream, HashTable * symbols, 
 			continue;
 		}
 
-		dump_frames_pprof_symbols(stream, symbols, next);
+		if (!dump_frames_pprof_symbols(stream, symbols, next)) {
+			return 0;
+		}
 
 		zend_hash_move_forward_ex(&f->next_cache, &pos);
 	}
+
+	return 1;
 }
 
-static void dump_pprof(php_stream * stream) {
+static zend_bool dump_pprof_symbols_section(php_stream * stream, HashTable * symbols) {
+	return (
+		stream_printf(stream, "--- symbol\n")					&&
+		stream_printf(stream, "binary=todo.php\n")				&&
+
+		dump_frames_pprof_symbols(stream, symbols, &root_frame)	&&
+
+		stream_printf(stream, "---\n")
+	);
+}
+
+static zend_bool dump_pprof_profile_section(php_stream * stream, HashTable * symbols) {
+	return (
+		stream_printf(stream, "--- profile\n") &&
+
+		/* header count */
+		stream_write_word(stream, 0)  &&
+
+		/* header words after this one */
+		stream_write_word(stream, 3)  &&
+
+		/* format version */
+		stream_write_word(stream, 0)  &&
+
+		/* sampling period */
+		stream_write_word(stream, 0)  &&
+
+		/* unused padding */
+		stream_write_word(stream, 0)  &&
+
+		dump_frames_pprof(stream, symbols, &root_frame)
+	);
+}
+
+static zend_bool dump_pprof(php_stream * stream) {
 	HashTable symbols;
 
 	zend_hash_init(&symbols, 8, NULL, NULL, 0);
 
-	/* symbols */
-
-	stream_printf(stream, "--- symbol\n");
-	stream_printf(stream, "binary=todo.php\n");
-	dump_frames_pprof_symbols(stream, &symbols, &root_frame);
-	stream_printf(stream, "---\n");
-	stream_printf(stream, "--- profile\n");
-
-	/* profile header */
-
-	/* header count */
-	stream_write_word(stream, 0);
-	/* header words after this one */
-	stream_write_word(stream, 3);
-	/* format version */
-	stream_write_word(stream, 0);
-	/* sampling period */
-	stream_write_word(stream, 0);
-	/* unused padding */
-	stream_write_word(stream, 0);
-
-	dump_frames_pprof(stream, &symbols, &root_frame);
+	zend_bool success = (
+		dump_pprof_symbols_section(stream, &symbols) &&
+		dump_pprof_profile_section(stream, &symbols)
+	);
 
 	zend_hash_destroy(&symbols);
+
+	return success;
 }
 
 /* {{{ proto void memprof_dump_array(void)
    Returns current memory usage as an array */
 PHP_FUNCTION(memprof_dump_array)
 {
+	zend_bool success;
+
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "") == FAILURE) {
 		return;
 	}
@@ -1530,11 +1617,16 @@ PHP_FUNCTION(memprof_dump_array)
 
 	WITHOUT_MALLOC_TRACKING {
 
-		dump_frame_array(return_value, &root_frame);
+		success = dump_frame_array(return_value, &root_frame);
 
 	} END_WITHOUT_MALLOC_TRACKING;
 
 	memprof_dumped = 1;
+
+	if (!success) {
+		zend_throw_exception(EG(exception_class), "memprof_dump_array(): dump failed, please check file permissions or disk capacity", 0);
+		return;
+	}
 }
 /* }}} */
 
@@ -1544,6 +1636,7 @@ PHP_FUNCTION(memprof_dump_callgrind)
 {
 	zval *arg1;
 	php_stream *stream;
+	zend_bool success;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &arg1) == FAILURE) {
 		return;
@@ -1557,10 +1650,15 @@ PHP_FUNCTION(memprof_dump_callgrind)
 	php_stream_from_zval(stream, arg1);
 
 	WITHOUT_MALLOC_TRACKING {
-		dump_callgrind(stream);
+		success = dump_callgrind(stream);
 	} END_WITHOUT_MALLOC_TRACKING;
 
 	memprof_dumped = 1;
+
+	if (!success) {
+		zend_throw_exception(EG(exception_class), "memprof_dump_callgrind(): dump failed, please check file permissions or disk capacity", 0);
+		return;
+	}
 }
 /* }}} */
 
@@ -1570,6 +1668,7 @@ PHP_FUNCTION(memprof_dump_pprof)
 {
 	zval *arg1;
 	php_stream *stream;
+	zend_bool success;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &arg1) == FAILURE) {
 		return;
@@ -1583,10 +1682,15 @@ PHP_FUNCTION(memprof_dump_pprof)
 	php_stream_from_zval(stream, arg1);
 
 	WITHOUT_MALLOC_TRACKING {
-		dump_pprof(stream);
+		success = dump_pprof(stream);
 	} END_WITHOUT_MALLOC_TRACKING;
 
 	memprof_dumped = 1;
+
+	if (!success) {
+		zend_throw_exception(EG(exception_class), "memprof_dump_pprof(): dump failed, please check file permissions or disk capacity", 0);
+		return;
+	}
 }
 /* }}} */
 
