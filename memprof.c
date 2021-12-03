@@ -237,7 +237,7 @@ static zend_mm_heap * orig_zheap = NULL;
 #define ALLOC_LIST_INSERT_HEAD(head, elem) alloc_list_insert_head(head, elem)
 #define ALLOC_LIST_REMOVE(elem) alloc_list_remove(elem)
 
-static void out_of_memory() {
+ZEND_NORETURN static void out_of_memory() {
 	fprintf(stderr, "memprof: System out of memory, try lowering memory_limit\n");
 	exit(1);
 }
@@ -256,6 +256,22 @@ static inline void * realloc_check(void * ptr, size_t size) {
 		out_of_memory();
 	}
 	return newptr;
+}
+
+ZEND_NORETURN static void int_overflow() {
+	fprintf(stderr, "memprof: Integer overflow in memory allocation, try lowering memory_limit\n");
+	exit(1);
+}
+
+static inline size_t safe_size(size_t nmemb, size_t size, size_t offset) {
+	size_t r = nmemb * size;
+	if (UNEXPECTED(nmemb != 0 && r / nmemb != size)) {
+		int_overflow();
+	}
+	if (UNEXPECTED(SIZE_MAX - r < offset)) {
+		int_overflow();
+	}
+	return r + offset;
 }
 
 static inline void alloc_init(alloc * alloc, size_t size) {
@@ -331,10 +347,10 @@ static void alloc_buckets_grow(alloc_buckets * buckets)
 	alloc_bucket_item * bucket;
 
 	buckets->nbuckets++;
-	buckets->buckets = realloc_check(buckets->buckets, sizeof(*buckets->buckets)*buckets->nbuckets);
+	buckets->buckets = realloc_check(buckets->buckets, safe_size(buckets->nbuckets, sizeof(*buckets->buckets), 0));
 
-	buckets->growsize <<= 1;
-	bucket = malloc_check(sizeof(*bucket)*buckets->growsize);
+	buckets->growsize = safe_size(2, buckets->growsize, 0);
+	bucket = malloc_check(safe_size(buckets->growsize, sizeof(*bucket), 0));
 	buckets->buckets[buckets->nbuckets-1] = bucket;
 
 	for (i = 1; i < buckets->growsize; ++i) {
@@ -410,7 +426,7 @@ static void frame_dtor(zval * pDest)
 static void init_frame(frame * f, frame * prev, char * name, size_t name_len)
 {
 	zend_hash_init(&f->next_cache, 0, NULL, frame_dtor, 0);
-	f->name = malloc_check(name_len+1);
+	f->name = malloc_check(safe_size(1, name_len, 1));
 	memcpy(f->name, name, name_len+1);
 	f->name_len = name_len;
 	f->calls = 0;
