@@ -237,6 +237,27 @@ static zend_mm_heap * orig_zheap = NULL;
 #define ALLOC_LIST_INSERT_HEAD(head, elem) alloc_list_insert_head(head, elem)
 #define ALLOC_LIST_REMOVE(elem) alloc_list_remove(elem)
 
+static void out_of_memory() {
+	fprintf(stderr, "memprof: System out of memory, try lowering memory_limit\n");
+	exit(1);
+}
+
+static inline void * malloc_check(size_t size) {
+	void * ptr = malloc(size);
+	if (UNEXPECTED(ptr == NULL)) {
+		out_of_memory();
+	}
+	return ptr;
+}
+
+static inline void * realloc_check(void * ptr, size_t size) {
+	void * newptr = realloc(ptr, size);
+	if (UNEXPECTED(newptr == NULL)) {
+		out_of_memory();
+	}
+	return newptr;
+}
+
 static inline void alloc_init(alloc * alloc, size_t size) {
 	alloc->size = size;
 	alloc->list.le_next = NULL;
@@ -310,10 +331,10 @@ static void alloc_buckets_grow(alloc_buckets * buckets)
 	alloc_bucket_item * bucket;
 
 	buckets->nbuckets++;
-	buckets->buckets = realloc(buckets->buckets, sizeof(*buckets->buckets)*buckets->nbuckets);
+	buckets->buckets = realloc_check(buckets->buckets, sizeof(*buckets->buckets)*buckets->nbuckets);
 
 	buckets->growsize <<= 1;
-	bucket = malloc(sizeof(*bucket)*buckets->growsize);
+	bucket = malloc_check(sizeof(*bucket)*buckets->growsize);
 	buckets->buckets[buckets->nbuckets-1] = bucket;
 
 	for (i = 1; i < buckets->growsize; ++i) {
@@ -389,7 +410,7 @@ static void frame_dtor(zval * pDest)
 static void init_frame(frame * f, frame * prev, char * name, size_t name_len)
 {
 	zend_hash_init(&f->next_cache, 0, NULL, frame_dtor, 0);
-	f->name = malloc(name_len+1);
+	f->name = malloc_check(name_len+1);
 	memcpy(f->name, name, name_len+1);
 	f->name_len = name_len;
 	f->calls = 0;
@@ -399,7 +420,7 @@ static void init_frame(frame * f, frame * prev, char * name, size_t name_len)
 
 static frame * new_frame(frame * prev, char * name, size_t name_len)
 {
-	frame * f = malloc(sizeof(*f));
+	frame * f = malloc_check(sizeof(*f));
 	init_frame(f, prev, name, name_len);
 	return f;
 }
@@ -484,7 +505,7 @@ static void * malloc_hook(size_t size, const void *caller)
 
 	WITHOUT_MALLOC_HOOKS {
 
-		result = malloc(size);
+		result = malloc_check(size);
 		if (result != NULL) {
 			alloc * a = alloc_buckets_alloc(&current_alloc_buckets, size);
 			if (track_mallocs) {
@@ -878,7 +899,7 @@ static void memprof_enable(memprof_profile_flags * pf)
 		/* There is no way to completely free a zend_mm_heap with custom
 		 * handlers, so we have to allocate it ourselves. We don't know the
 		 * actual size of a _zend_mm_heap struct, but this should be enough. */
-		zheap = malloc(zend_mm_heap_size);
+		zheap = malloc_check(zend_mm_heap_size);
 		memset(zheap, 0, zend_mm_heap_size);
 		zend_mm_set_custom_handlers(zheap, zend_malloc_handler, zend_free_handler, zend_realloc_handler);
 		orig_zheap = zend_mm_set_heap(zheap);
