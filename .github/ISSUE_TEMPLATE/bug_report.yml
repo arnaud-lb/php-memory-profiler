@@ -26,13 +26,14 @@ body:
     attributes:
       label: php-memprof Version
       description: "The used php-memprof version (if installed from the repository, please specify the commit number)."
-      placeholder: "php-memprof 3.0.1"
+      placeholder: "php-memprof 3.0.1 (or commit number)"
     validations:
       required: true
   - type: input
     attributes:
       label: PHP Version
       description: "The used PHP version."
+      placeholder: "PHP 8.1.0"
     validations:
       required: true
   - type: input
