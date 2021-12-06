@@ -1,0 +1,44 @@
+name: Bug report
+description: Create a bug report
+labels: ["bug"]
+body:
+  - type: textarea
+    attributes:
+      label: Description
+      description: "Please provide a minimal way to reproduce the problem and describe what the expected vs actual behavior is."
+      value: |
+        The following code:
+
+        ```php
+        <?php
+        ```
+
+        Resulted in this output:
+        ```
+        ```
+
+        But I expected this output instead:
+        ```
+        ```
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: php-memprof Version
+      description: "The used php-memprof version (if installed from the repository, please specify the commit number)."
+      placeholder: "php-memprof 3.0.1"
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: PHP Version
+      description: "The used PHP version."
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Operating System
+      description: "The used operating system."
+      placeholder: "Ubuntu 20.04"
+    validations:
+      required: true
