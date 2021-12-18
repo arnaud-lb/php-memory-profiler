@@ -5,6 +5,8 @@ on:
         branches:
             - v3
     pull_request:
+    schedule:
+        - cron: '30 8 * * 1'
 
 jobs:
     tests:
