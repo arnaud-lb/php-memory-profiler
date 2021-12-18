@@ -56,6 +56,9 @@ jobs:
             - name: 'Build PHP'
               run: './ext/.github/workflows/test/build-php.sh'
 
+            - name: 'Install xdebug'
+              run: './ext/.github/workflows/test/build-xdebug.sh'
+
             - name: 'Build extension'
               run: './ext/.github/workflows/test/build-extension.sh'
 
