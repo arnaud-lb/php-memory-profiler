@@ -217,6 +217,9 @@ static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, zv
 #endif
 
 static void (*old_zend_error_cb)(MEMPROF_ZEND_ERROR_CB_ARGS);
+static void (*rinit_zend_error_cb)(MEMPROF_ZEND_ERROR_CB_ARGS);
+static zend_bool zend_error_cb_overridden;
+static void memprof_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS);
 
 static PHP_INI_MH((*origOnChangeMemoryLimit)) = NULL;
 
@@ -718,8 +721,20 @@ static void * zend_realloc_handler(void * ptr, size_t size)
 	return result;
 }
 
+// Some extensions override zend_error_cb and don't call the previous
+// zend_error_cb, so memprof needs to be the last to override it
+static void memprof_late_override_error_cb() {
+	old_zend_error_cb = zend_error_cb;
+	zend_error_cb = memprof_zend_error_cb;
+	zend_error_cb_overridden = 1;
+}
+
 static void memprof_zend_execute(zend_execute_data *execute_data)
 {
+	if (UNEXPECTED(!zend_error_cb_overridden)) {
+		memprof_late_override_error_cb();
+	}
+
 	WITHOUT_MALLOC_TRACKING {
 
 		current_frame = get_or_create_frame(execute_data, current_frame);
@@ -739,6 +754,10 @@ static void memprof_zend_execute(zend_execute_data *execute_data)
 static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, zval *return_value)
 {
 	int ignore = 0;
+
+	if (UNEXPECTED(!zend_error_cb_overridden)) {
+		memprof_late_override_error_cb();
+	}
 
 	if (&execute_data_ptr->func->internal_function == &zend_pass_function) {
 		ignore = 1;
@@ -1191,9 +1210,6 @@ PHP_MINIT_FUNCTION(memprof)
 		}
 	}
 
-	old_zend_error_cb = zend_error_cb;
-	zend_error_cb = memprof_zend_error_cb;
-
 	return SUCCESS;
 }
 /* }}} */
@@ -1231,6 +1247,9 @@ PHP_RINIT_FUNCTION(memprof)
 		memprof_enable(&MEMPROF_G(profile_flags));
 	}
 
+	rinit_zend_error_cb = zend_error_cb;
+	zend_error_cb_overridden = 0;
+
 	return SUCCESS;
 }
 /* }}} */
@@ -1242,6 +1261,8 @@ PHP_RSHUTDOWN_FUNCTION(memprof)
 	if (MEMPROF_G(profile_flags).enabled) {
 		memprof_disable();
 	}
+
+	zend_error_cb = rinit_zend_error_cb;
 
 	return SUCCESS;
 }
