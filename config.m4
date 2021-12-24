@@ -20,7 +20,7 @@ if test "$PHP_MEMPROF" != "no"; then
   if test -r $PHP_JUDY_DIR/$SEARCH_FOR; then
     JUDY_DIR=$PHP_JUDY_DIR
   else
-    AC_MSG_CHECKING([for judy files in default path])
+    AC_MSG_CHECKING([for include/Judy.h in $SEARCH_PATH])
     for i in $SEARCH_PATH ; do
       if test -r $i/$SEARCH_FOR; then
         JUDY_DIR=$i
@@ -31,7 +31,7 @@ if test "$PHP_MEMPROF" != "no"; then
 
   if test -z "$JUDY_DIR"; then
     AC_MSG_RESULT([not found])
-    AC_MSG_ERROR([Please reinstall the judy distribution])
+    AC_MSG_ERROR([Please install lib judy])
   fi
 
   PHP_ADD_INCLUDE($JUDY_DIR/include)
