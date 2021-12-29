@@ -367,18 +367,13 @@ static void destroy_frame(frame * f)
 {
 	alloc * a;
 
-#if MEMPROF_DEBUG
-	memset(f->name, 0x5a, f->name_len);
-#endif
-	free(f->name);
-
 	while (f->allocs.lh_first) {
 		a = f->allocs.lh_first;
 		ALLOC_CHECK(a);
 		ALLOC_LIST_REMOVE(a);
 	}
 
-	zend_hash_destroy(&f->next_cache);
+	zend_hash_destroy(&f->callees);
 
 #if MEMPROF_DEBUG
 	memset(f, 0x5a, sizeof(*f));
@@ -393,21 +388,17 @@ static void frame_dtor(zval * pDest)
 	free(f);
 }
 
-static void init_frame(frame * f, frame * prev, char * name, size_t name_len)
+static void init_frame(frame * f)
 {
-	zend_hash_init(&f->next_cache, 0, NULL, frame_dtor, 0);
-	f->name = malloc_check(safe_size(1, name_len, 1));
-	memcpy(f->name, name, name_len+1);
-	f->name_len = name_len;
+	zend_hash_init(&f->callees, 0, NULL, frame_dtor, 0);
 	f->calls = 0;
-	f->prev = prev;
 	LIST_INIT(&f->allocs);
 }
 
-static frame * new_frame(frame * prev, char * name, size_t name_len)
+static frame * new_frame()
 {
 	frame * f = malloc_check(sizeof(*f));
-	init_frame(f, prev, name, name_len);
+	init_frame(f);
 	return f;
 }
 
@@ -420,10 +411,10 @@ static frame * get_or_create_frame(zend_execute_data * current_execute_data, fra
 
 	name_len = get_function_name(current_execute_data, name, sizeof(name));
 
-	f = zend_hash_str_find_ptr(&prev->next_cache, name, name_len);
+	f = zend_hash_str_find_ptr(&prev->callees, name, name_len);
 	if (f == NULL) {
-		f = new_frame(prev, name, name_len);
-		zend_hash_str_add_ptr(&prev->next_cache, name, name_len, f);
+		f = new_frame();
+		zend_hash_str_add_ptr(&prev->callees, name, name_len, f);
 	}
 
 	return f;
@@ -672,12 +663,15 @@ static void memprof_late_override_error_cb() {
 
 static void memprof_zend_execute(zend_execute_data *execute_data)
 {
+	frame * prev;
+
 	if (UNEXPECTED(!zend_error_cb_overridden)) {
 		memprof_late_override_error_cb();
 	}
 
 	WITHOUT_MALLOC_TRACKING {
 
+		prev = current_frame;
 		current_frame = get_or_create_frame(execute_data, current_frame);
 		current_frame->calls++;
 		current_alloc_list = &current_frame->allocs;
@@ -687,7 +681,7 @@ static void memprof_zend_execute(zend_execute_data *execute_data)
 	old_zend_execute(execute_data);
 
 	if (MEMPROF_G(profile_flags).enabled) {
-		current_frame = current_frame->prev;
+		current_frame = prev;
 		current_alloc_list = &current_frame->allocs;
 	}
 }
@@ -695,6 +689,7 @@ static void memprof_zend_execute(zend_execute_data *execute_data)
 static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, zval *return_value)
 {
 	int ignore = 0;
+	frame * prev;
 
 	if (UNEXPECTED(!zend_error_cb_overridden)) {
 		memprof_late_override_error_cb();
@@ -718,6 +713,7 @@ static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, z
 	WITHOUT_MALLOC_TRACKING {
 
 		if (!ignore) {
+			prev = current_frame;
 			current_frame = get_or_create_frame(execute_data_ptr, current_frame);
 			current_frame->calls++;
 			current_alloc_list = &current_frame->allocs;
@@ -732,7 +728,7 @@ static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, z
 	}
 
 	if (!ignore && MEMPROF_G(profile_flags).enabled) {
-		current_frame = current_frame->prev;
+		current_frame = prev;
 		current_alloc_list = &current_frame->allocs;
 	}
 }
@@ -893,7 +889,7 @@ static void memprof_enable(memprof_profile_flags * pf)
 
 	alloc_buckets_init(&current_alloc_buckets);
 
-	init_frame(&root_frame, &root_frame, "root", sizeof("root")-1);
+	init_frame(&root_frame);
 	root_frame.calls = 1;
 
 	current_frame = &root_frame;

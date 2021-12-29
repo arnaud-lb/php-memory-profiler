@@ -29,15 +29,15 @@ static zend_bool dump_frame_callgrind(php_stream * stream, frame * f, char * fna
 	HashPosition pos;
 	zval * znext;
 
-	zend_hash_internal_pointer_reset_ex(&f->next_cache, &pos);
-	while ((znext = zend_hash_get_current_data_ex(&f->next_cache, &pos)) != NULL) {
+	zend_hash_internal_pointer_reset_ex(&f->callees, &pos);
+	while ((znext = zend_hash_get_current_data_ex(&f->callees, &pos)) != NULL) {
 		zend_string * str_key;
 		zend_ulong num_key;
 		size_t call_size;
 		size_t call_count;
 		frame * next = Z_PTR_P(znext);
 
-		if (HASH_KEY_IS_STRING != zend_hash_get_current_key_ex(&f->next_cache, &str_key, &num_key, &pos)) {
+		if (HASH_KEY_IS_STRING != zend_hash_get_current_key_ex(&f->callees, &str_key, &num_key, &pos)) {
 			continue;
 		}
 
@@ -48,7 +48,7 @@ static zend_bool dump_frame_callgrind(php_stream * stream, frame * f, char * fna
 		size += call_size;
 		count += call_count;
 
-		zend_hash_move_forward_ex(&f->next_cache, &pos);
+		zend_hash_move_forward_ex(&f->callees, &pos);
 	}
 
 	if (
@@ -69,15 +69,15 @@ static zend_bool dump_frame_callgrind(php_stream * stream, frame * f, char * fna
 		return 0;
 	}
 
-	zend_hash_internal_pointer_reset_ex(&f->next_cache, &pos);
-	while ((znext = zend_hash_get_current_data_ex(&f->next_cache, &pos)) != NULL) {
+	zend_hash_internal_pointer_reset_ex(&f->callees, &pos);
+	while ((znext = zend_hash_get_current_data_ex(&f->callees, &pos)) != NULL) {
 		zend_string * str_key;
 		zend_ulong num_key;
 		size_t call_size;
 		size_t call_count;
 		frame * next = Z_PTR_P(znext);
 
-		if (HASH_KEY_IS_STRING != zend_hash_get_current_key_ex(&f->next_cache, &str_key, &num_key, &pos)) {
+		if (HASH_KEY_IS_STRING != zend_hash_get_current_key_ex(&f->callees, &str_key, &num_key, &pos)) {
 			continue;
 		}
 
@@ -92,7 +92,7 @@ static zend_bool dump_frame_callgrind(php_stream * stream, frame * f, char * fna
 			return 0;
 		}
 
-		zend_hash_move_forward_ex(&f->next_cache, &pos);
+		zend_hash_move_forward_ex(&f->callees, &pos);
 	}
 
 	if (!stream_printf(stream, "\n")) {

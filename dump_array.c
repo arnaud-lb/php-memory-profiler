@@ -48,22 +48,22 @@ zend_bool memprof_dump_array(zval * dest, frame * f)
 
 	array_init(&zcalled_functions);
 
-	zend_hash_internal_pointer_reset_ex(&f->next_cache, &pos);
-	while ((znext = zend_hash_get_current_data_ex(&f->next_cache, &pos)) != NULL) {
+	zend_hash_internal_pointer_reset_ex(&f->callees, &pos);
+	while ((znext = zend_hash_get_current_data_ex(&f->callees, &pos)) != NULL) {
 
 		zend_string * str_key;
 		zend_ulong num_key;
 		zval zcalled_function;
 		frame * next = Z_PTR_P(znext);
 
-		if (HASH_KEY_IS_STRING != zend_hash_get_current_key_ex(&f->next_cache, &str_key, &num_key, &pos)) {
+		if (HASH_KEY_IS_STRING != zend_hash_get_current_key_ex(&f->callees, &str_key, &num_key, &pos)) {
 			continue;
 		}
 
 		memprof_dump_array(&zcalled_function, next);
 		add_assoc_zval_ex(&zcalled_functions, ZSTR_VAL(str_key), ZSTR_LEN(str_key), &zcalled_function);
 
-		zend_hash_move_forward_ex(&f->next_cache, &pos);
+		zend_hash_move_forward_ex(&f->callees, &pos);
 	}
 
 	add_assoc_zval_ex(zframe, ZEND_STRL("called_functions"), &zcalled_functions);
