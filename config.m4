@@ -78,7 +78,7 @@ if test "$PHP_MEMPROF" != "no"; then
 
   AC_DEFINE([MEMPROF_CONFIGURE_VERSION], 3, [Define configure version])
 
-  PHP_NEW_EXTENSION(memprof, memprof.c util.c, $ext_shared)
+  PHP_NEW_EXTENSION(memprof, memprof.c util.c dump_array.c dump_callgrind.c dump_pprof.c, $ext_shared)
 fi
 
 if test "$PHP_MEMPROF_DEBUG" != "no"; then
