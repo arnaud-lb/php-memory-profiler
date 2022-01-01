@@ -2,11 +2,15 @@
 
 set -ex
 
+if which apt-get >/dev/null 2>&1; then
+    sudo apt-get -y install zlib1g-dev:$BUILD_ARCH
+fi
+
 if [ "$MEMORY_CHECK" = "1" ]; then
     if which apt-get >/dev/null 2>&1; then
-        sudo apt-get -y install valgrind
+        sudo apt-get -y install valgrind:$BUILD_ARCH
     else
-        break install valgrind
+        brew install valgrind
     fi
 fi
 
@@ -36,7 +40,15 @@ if ! [ -f "$HOME/build-cache/php/$PREFIX/bin/php" ]; then
         PHP_BUILD_FLAGS="$PHP_BUILD_FLAGS --with-valgrind"
     fi
 
-    ./configure $PHP_BUILD_FLAGS $PHP_BUILD_EXTRA_FLAGS
+    case "$BUILD_ARCH" in
+        i386)
+            PHP_BUILD_CFLAGS="$PHP_BUILD_CFLAGS -m32"
+            PHP_BUILD_ASFLAGS="$PHP_BUILD_ASFLAGS -m32"
+            PHP_BUILD_FLAGS="$PHP_BUILD_FLAGS --host=$BUILD_ARCH"
+            ;;
+    esac
+
+    ASFLAGS="$PHP_BUILD_ASFLAGS=" CFLAGS="$PHP_BUILD_CFLAGS" ./configure $PHP_BUILD_FLAGS
     make -j $(nproc)
     rm -rf "$HOME/build-cache/php"
     mkdir -p ~/build-cache/php

@@ -9,7 +9,7 @@ echo "Building extension with PHP version:"
 php --version
 
 if which apt-get >/dev/null 2>&1; then
-    sudo apt-get -y install libjudy-dev
+    sudo apt-get -y install libjudy-dev:$BUILD_ARCH
 else
     brew install traildb/judy/judy
 fi
@@ -17,6 +17,12 @@ fi
 if [ "$WERROR" = "1" ]; then
     PHP_EXT_CFLAGS="-Wall -Werror -Wno-deprecated-declarations"
 fi
+
+case "$BUILD_ARCH" in
+    i386)
+        PHP_EXT_CFLAGS="$PHP_EXT_CFLAGS -m32"
+        ;;
+esac
 
 cd ext
 phpize
