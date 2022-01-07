@@ -48,6 +48,10 @@ Download the source and run the following commands in the source directory:
     make
     make install
 
+If libjudy is installed in a non-standard path (/usr or /usr/local), you can specify it like this:
+
+    ./configure --with-judy-dir=/opt/homebrew/Cellar/judy/1.0.5
+
 ## Loading the extension
 
 The extension can be loaded on the command line, just for one script:
