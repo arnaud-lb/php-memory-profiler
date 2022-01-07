@@ -874,6 +874,7 @@ static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
 			} else {
 				new_message = strpprintf(0, "%s (memprof failed dumping to %s, please check file permissions or disk capacity)", message_chr, filename);
 			}
+			efree(filename);
 		}
 
 		if (new_message != NULL) {
@@ -892,9 +893,6 @@ static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
 	old_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
 
 	WITHOUT_MALLOC_TRACKING {
-		if (filename != NULL) {
-			free(filename);
-		}
 		if (new_message != NULL) {
 			zend_string_free(new_message);
 		}
