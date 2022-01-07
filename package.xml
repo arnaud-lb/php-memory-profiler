@@ -46,8 +46,13 @@
      <file name="006.phpt" role="test" />
      <file name="007.phpt" role="test" />
      <file name="autodump-disabled.phpt" role="test" />
+     <file name="autodump-failure.phpt" role="test" />
      <file name="autodump.phpt" role="test" />
+     <file name="autodump-xdebug.phpt" role="test" />
      <file name="common.php" role="test" />
+     <file name="dump-failure.phpt" role="test" />
+     <file name="dump-pprof.phpt" role="test" />
+     <file name="memprof-version.phpt" role="test" />
      <file name="zend_pass_function.phpt" role="test" />
    </dir>
   </dir>
