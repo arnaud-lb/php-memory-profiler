@@ -37,6 +37,8 @@ Make sure to install [dependencies](#dependencies), and then:
 
     pecl install memprof
 
+> ℹ️ If libjudy is installed in a non-standard path (not /usr or /usr/local), please use the manual installation method bellow.
+
 ### Installing manually
 
 Make sure to install [dependencies](#dependencies), and then:
@@ -48,7 +50,7 @@ Download the source and run the following commands in the source directory:
     make
     make install
 
-If libjudy is installed in a non-standard path (/usr or /usr/local), you can specify it like this:
+> ℹ️ If libjudy is installed in a non-standard path (not /usr or /usr/local), you can specify it like this:
 
     ./configure --with-judy-dir=/opt/homebrew/Cellar/judy/1.0.5
 
