@@ -37,7 +37,7 @@ Make sure to install [dependencies](#dependencies), and then:
 
     pecl install memprof
 
-> ℹ️ If libjudy is installed in a non-standard path (not /usr or /usr/local), please use the manual installation method bellow.
+> **Note** If libjudy is installed in a non-standard path (not /usr or /usr/local), please use the manual installation method bellow.
 
 ### Installing manually
 
@@ -50,7 +50,7 @@ Download the source and run the following commands in the source directory:
     make
     make install
 
-> ℹ️ If libjudy is installed in a non-standard path (not /usr or /usr/local), you can specify it like this:
+> **Note** If libjudy is installed in a non-standard path (not /usr or /usr/local), you can specify it like this:
 
     ./configure --with-judy-dir=/opt/homebrew/Cellar/judy/1.0.5
 
@@ -98,7 +98,7 @@ Or the `$_POST` variable:
 curl -d MEMPROF_PROFILE=dump_on_limit http://127.0.0.1/test.php
 ```
 
-> :information_source: The `memprof_enabled_flags()` function can be called to
+> **Note** The `memprof_enabled_flags()` function can be called to
 > check whether profiling is currently enabled in `dump_on_limit` mode.
 
 ### Step 2: Dumping the profile
