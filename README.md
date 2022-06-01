@@ -54,6 +54,15 @@ Download the source and run the following commands in the source directory:
 
     ./configure --with-judy-dir=/opt/homebrew/Cellar/judy/1.0.5
 
+### Installing on Arch Linux
+
+Arch Linux users may prefer to install the unofficial php-memprof [package][8]
+with `makepkg` or their preferred AUR [helper][9]. If using `yay`, for example:
+
+    yay -S php-memprof
+
+> ℹ️ Please report any issues with this package on its AUR [page][8].
+
 ## Loading the extension
 
 The extension can be loaded on the command line, just for one script:
@@ -347,3 +356,5 @@ See [INTERNALS.md][7]
 [5]: https://github.com/gperftools/gperftools
 [6]: https://www.google.com/search?q=qcachegrind
 [7]: https://github.com/arnaud-lb/php-memory-profiler/blob/master/INTERNALS.md
+[8]: https://aur.archlinux.org/packages/php-memprof/
+[9]: https://wiki.archlinux.org/title/AUR_helpers
