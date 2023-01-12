@@ -37,6 +37,9 @@ Make sure to install [dependencies](#dependencies), and then:
 
     pecl install memprof
 
+On MacOS:
+    JUDY_DIR="/opt/homebrew/Cellar/judy/1.0.5" pecl install memprof
+
 > **Note** If libjudy is installed in a non-standard path (not /usr or /usr/local), please use the manual installation method bellow.
 
 ### Installing manually
