@@ -1415,7 +1415,7 @@ static zend_bool dump_frame_callgrind(php_stream * stream, frame * f, char * fna
 	}
 
 	if (
-		!stream_printf(stream, "fl=/todo.php\n") ||
+		!stream_printf(stream, "fl=%s\n", stream->orig_path) ||
 		!stream_printf(stream, "fn=%s\n", fname)
 	) {
 		return 0;
@@ -1447,7 +1447,7 @@ static zend_bool dump_frame_callgrind(php_stream * stream, frame * f, char * fna
 		frame_inclusive_cost(next, &call_size, &call_count);
 
 		if (
-			!stream_printf(stream, "cfl=/todo.php\n")						||
+			!stream_printf(stream, "cfl=%s\n", stream->orig_path)			||
 			!stream_printf(stream, "cfn=%s\n", ZSTR_VAL(str_key))			||
 			!stream_printf(stream, "calls=%zu 1\n", next->calls)			||
 			!stream_printf(stream, "1 %zu %zu\n", call_size, call_count)
@@ -1573,7 +1573,7 @@ static zend_bool dump_frames_pprof_symbols(php_stream * stream, HashTable * symb
 static zend_bool dump_pprof_symbols_section(php_stream * stream, HashTable * symbols) {
 	return (
 		stream_printf(stream, "--- symbol\n")					&&
-		stream_printf(stream, "binary=todo.php\n")				&&
+		stream_printf(stream, "binary=%s\n", stream->orig_path)	&&
 
 		dump_frames_pprof_symbols(stream, symbols, &root_frame)	&&
 
