@@ -145,8 +145,10 @@ typedef LIST_HEAD(_alloc_list_head, _alloc) alloc_list_head;
 
 /* a call frame */
 typedef struct _frame {
-	char * name;
-	size_t name_len;
+	char * fn_name;
+	size_t fn_name_len;
+	char * file_name;
+	size_t file_name_len;
 	struct _frame * prev;
 	size_t calls;
 	HashTable next_cache;
@@ -403,9 +405,11 @@ static void destroy_frame(frame * f)
 	alloc * a;
 
 #if MEMPROF_DEBUG
-	memset(f->name, 0x5a, f->name_len);
+	memset(f->file_name, 0x5a, f->file_name_len);
+	memset(f->fn_name, 0x5a, f->fn_name_len);
 #endif
-	free(f->name);
+	free(f->file_name);
+	free(f->fn_name);
 
 	while (f->allocs.lh_first) {
 		a = f->allocs.lh_first;
@@ -428,21 +432,27 @@ static void frame_dtor(zval * pDest)
 	free(f);
 }
 
-static void init_frame(frame * f, frame * prev, char * name, size_t name_len)
+static void init_frame(frame * f, frame * prev, char *file_name, size_t file_name_len, char * fn_name, size_t fn_name_len)
 {
 	zend_hash_init(&f->next_cache, 0, NULL, frame_dtor, 0);
-	f->name = malloc_check(safe_size(1, name_len, 1));
-	memcpy(f->name, name, name_len+1);
-	f->name_len = name_len;
+
+	f->file_name = malloc_check(safe_size(1, file_name_len, 1));
+	memcpy(f->file_name, file_name, file_name_len+1);
+	f->file_name_len = file_name_len;
+
+	f->fn_name = malloc_check(safe_size(1, fn_name_len, 1));
+	memcpy(f->fn_name, fn_name, fn_name_len+1);
+	f->fn_name_len = fn_name_len;
+
 	f->calls = 0;
 	f->prev = prev;
 	LIST_INIT(&f->allocs);
 }
 
-static frame * new_frame(frame * prev, char * name, size_t name_len)
+static frame * new_frame(frame * prev, char *file_name, size_t file_name_len, char * fn_name, size_t fn_name_len)
 {
 	frame * f = malloc_check(sizeof(*f));
-	init_frame(f, prev, name, name_len);
+	init_frame(f, prev, file_name, file_name_len, fn_name, fn_name_len);
 	return f;
 }
 
@@ -450,15 +460,22 @@ static frame * get_or_create_frame(zend_execute_data * current_execute_data, fra
 {
 	frame * f;
 
-	char name[256];
-	size_t name_len;
+	char file_name[256];
+	char fn_name[256];
+	size_t file_name_len;
+	size_t fn_name_len;
 
-	name_len = get_function_name(current_execute_data, name, sizeof(name));
+	file_name_len = get_file_name(current_execute_data, file_name, sizeof(file_name));
+	fn_name_len = get_function_name(current_execute_data, fn_name, sizeof(fn_name));
 
-	f = zend_hash_str_find_ptr(&prev->next_cache, name, name_len);
+	if (prev == NULL) {
+		return new_frame(prev, file_name, file_name_len, fn_name, fn_name_len);
+	}
+
+	f = zend_hash_str_find_ptr(&prev->next_cache, fn_name, fn_name_len);
 	if (f == NULL) {
-		f = new_frame(prev, name, name_len);
-		zend_hash_str_add_ptr(&prev->next_cache, name, name_len, f);
+		f = new_frame(prev, file_name, file_name_len, fn_name, fn_name_len);
+		zend_hash_str_add_ptr(&prev->next_cache, fn_name, fn_name_len, f);
 	}
 
 	return f;
@@ -950,7 +967,7 @@ static void memprof_enable(memprof_profile_flags * pf)
 
 	alloc_buckets_init(&current_alloc_buckets);
 
-	init_frame(&root_frame, &root_frame, "root", sizeof("root")-1);
+	init_frame(&root_frame, &root_frame, "", 0, "root", sizeof("root")-1);
 	root_frame.calls = 1;
 
 	current_frame = &root_frame;
@@ -1415,7 +1432,7 @@ static zend_bool dump_frame_callgrind(php_stream * stream, frame * f, char * fna
 	}
 
 	if (
-		!stream_printf(stream, "fl=/todo.php\n") ||
+		!stream_printf(stream, "fl=%s\n", f->file_name) ||
 		!stream_printf(stream, "fn=%s\n", fname)
 	) {
 		return 0;
@@ -1447,7 +1464,7 @@ static zend_bool dump_frame_callgrind(php_stream * stream, frame * f, char * fna
 		frame_inclusive_cost(next, &call_size, &call_count);
 
 		if (
-			!stream_printf(stream, "cfl=/todo.php\n")						||
+			!stream_printf(stream, "cfl=%s\n", next->file_name)				||
 			!stream_printf(stream, "cfn=%s\n", ZSTR_VAL(str_key))			||
 			!stream_printf(stream, "calls=%zu 1\n", next->calls)			||
 			!stream_printf(stream, "1 %zu %zu\n", call_size, call_count)
@@ -1503,7 +1520,7 @@ static zend_bool dump_frames_pprof(php_stream * stream, HashTable * symbols, fra
 
 		for (prev = f; prev != &root_frame; prev = prev->prev) {
 			zend_uintptr_t symaddr;
-			symaddr = (zend_uintptr_t) zend_hash_str_find_ptr(symbols, prev->name, prev->name_len);
+			symaddr = (zend_uintptr_t) zend_hash_str_find_ptr(symbols, prev->fn_name, prev->fn_name_len);
 			if (symaddr == 0) {
 				/* shouldn't happen */
 				zend_error(E_CORE_ERROR, "symbol address not found");
@@ -1541,11 +1558,11 @@ static zend_bool dump_frames_pprof_symbols(php_stream * stream, HashTable * symb
 	zval * znext;
 	zend_uintptr_t symaddr;
 
-	if (!zend_hash_str_exists(symbols, f->name, f->name_len)) {
+	if (!zend_hash_str_exists(symbols, f->fn_name, f->fn_name_len)) {
 		/* addr only has to be unique */
 		symaddr = (symbols->nNumOfElements+1)<<3;
-		zend_hash_str_add_ptr(symbols, f->name, f->name_len, (void*) symaddr);
-		if (!stream_printf(stream, "0x%0*x %s\n", sizeof(symaddr)*2, symaddr, f->name)) {
+		zend_hash_str_add_ptr(symbols, f->fn_name, f->fn_name_len, (void*) symaddr);
+		if (!stream_printf(stream, "0x%0*x %s\n", sizeof(symaddr)*2, symaddr, f->fn_name)) {
 			return 0;
 		}
 	}
@@ -1573,7 +1590,7 @@ static zend_bool dump_frames_pprof_symbols(php_stream * stream, HashTable * symb
 static zend_bool dump_pprof_symbols_section(php_stream * stream, HashTable * symbols) {
 	return (
 		stream_printf(stream, "--- symbol\n")					&&
-		stream_printf(stream, "binary=todo.php\n")				&&
+		stream_printf(stream, "binary=%s\n", stream->orig_path)	&&
 
 		dump_frames_pprof_symbols(stream, symbols, &root_frame)	&&
 

@@ -14,7 +14,7 @@ memprof_dump_pprof(STDOUT);
 
 --EXPECTF--
 --- symbol
-binary=todo.php
+binary=php://stdout
 0x0000000000000008 root
 0x0000000000000010 require %sdump-pprof.php
 0x0000000000000018 require %scommon.php
