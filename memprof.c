@@ -233,9 +233,8 @@ static alloc_buckets current_alloc_buckets;
 
 static Pvoid_t allocs_set = (Pvoid_t) NULL;
 
-static const size_t zend_mm_heap_size = 4096;
-static zend_mm_heap * zheap = NULL;
-static zend_mm_heap * orig_zheap = NULL;
+/* TODO: move to MEMPROF_G */
+zend_mm_observer* observer = NULL;
 
 #define ALLOC_INIT(alloc, size) alloc_init(alloc, size)
 
@@ -633,30 +632,25 @@ static void * memalign_hook(size_t alignment, size_t size, const void *caller)
 	track_mallocs = ___old_track_mallocs; \
 } while (0)
 
-static void * zend_malloc_handler(size_t size)
+static void zend_malloc_observer(size_t size, void *ptr ZEND_FILE_LINE_DC ZEND_FILE_LINE_ORIG_DC)
 {
-	void *result;
-
 	assert(MEMPROF_G(profile_flags).enabled);
 
 	WITHOUT_MALLOC_HOOKS {
 
-		result = zend_mm_alloc(orig_zheap, size);
-		if (result != NULL) {
+		if (ptr != NULL) {
 			alloc * a = alloc_buckets_alloc(&current_alloc_buckets, size);
 			if (track_mallocs) {
 				ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
 			}
-			mark_own_alloc(&allocs_set, result, a);
-			assert(is_own_alloc(&allocs_set, result));
+			mark_own_alloc(&allocs_set, ptr, a);
+			assert(is_own_alloc(&allocs_set, ptr));
 		}
 
 	} END_WITHOUT_MALLOC_HOOKS;
-
-	return result;
 }
 
-static void zend_free_handler(void * ptr)
+static void zend_free_observer(void * ptr ZEND_FILE_LINE_DC ZEND_FILE_LINE_ORIG_DC)
 {
 	assert(MEMPROF_G(profile_flags).enabled);
 
@@ -667,58 +661,40 @@ static void zend_free_handler(void * ptr)
 			if ((a = is_own_alloc(&allocs_set, ptr))) {
 				ALLOC_CHECK(a);
 				ALLOC_LIST_REMOVE(a);
-				zend_mm_free(orig_zheap, ptr);
 				unmark_own_alloc(&allocs_set, ptr);
 				alloc_buckets_free(&current_alloc_buckets, a);
-			} else {
-				zend_mm_free(orig_zheap, ptr);
 			}
 		}
 
 	} END_WITHOUT_MALLOC_HOOKS;
 }
 
-static void * zend_realloc_handler(void * ptr, size_t size)
+static void zend_realloc_observer(void * ptr, size_t size, void * new_ptr ZEND_FILE_LINE_DC ZEND_FILE_LINE_ORIG_DC)
 {
-	void *result;
 	alloc *a;
 
 	assert(MEMPROF_G(profile_flags).enabled);
 
 	WITHOUT_MALLOC_HOOKS {
 
-		if (ptr != NULL && !(a = is_own_alloc(&allocs_set, ptr))) {
-			result = zend_mm_realloc(orig_zheap, ptr, size);
-		} else {
-			/* ptr may be freed by realloc, so we must remove it from list now */
-			if (ptr != NULL) {
+		if (ptr != NULL) {
+			a = is_own_alloc(&allocs_set, ptr);
+			if (a != NULL) {
 				ALLOC_CHECK(a);
 				ALLOC_LIST_REMOVE(a);
 				unmark_own_alloc(&allocs_set, ptr);
 				alloc_buckets_free(&current_alloc_buckets, a);
 			}
-
-			result = zend_mm_realloc(orig_zheap, ptr, size);
-			if (result != NULL) {
-				/* succeeded; add result */
-				a = alloc_buckets_alloc(&current_alloc_buckets, size);
-				if (track_mallocs) {
-					ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
-				}
-				mark_own_alloc(&allocs_set, result, a);
-			} else if (ptr != NULL) {
-				/* failed, re-add ptr, since it hasn't been freed */
-				a = alloc_buckets_alloc(&current_alloc_buckets, size);
-				if (track_mallocs) {
-					ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
-				}
-				mark_own_alloc(&allocs_set, ptr, a);
+		}
+		if (new_ptr != NULL) {
+			a = alloc_buckets_alloc(&current_alloc_buckets, size);
+			if (track_mallocs) {
+				ALLOC_LIST_INSERT_HEAD(current_alloc_list, a);
 			}
+			mark_own_alloc(&allocs_set, new_ptr, a);
 		}
 
 	} END_WITHOUT_MALLOC_HOOKS;
-
-	return result;
 }
 
 // Some extensions override zend_error_cb and don't call the previous
@@ -843,9 +819,7 @@ static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
 #endif
 	zend_string * new_message = NULL;
 
-	zend_mm_set_heap(orig_zheap);
 	zend_set_memory_limit((size_t)Z_L(-1) >> (size_t)Z_L(1));
-	zend_mm_set_heap(zheap);
 
 	WITHOUT_MALLOC_TRACKING {
 		if (MEMPROF_G(output_format) == FORMAT_CALLGRIND) {
@@ -886,9 +860,7 @@ static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
 		}
 	} END_WITHOUT_MALLOC_TRACKING;
 
-	zend_mm_set_heap(orig_zheap);
 	zend_set_memory_limit(PG(memory_limit));
-	zend_mm_set_heap(zheap);
 
 	old_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
 
@@ -921,6 +893,7 @@ static void memprof_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS)
 	return memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
 }
 
+#if 0
 static PHP_INI_MH(OnChangeMemoryLimit)
 {
 	int ret;
@@ -935,7 +908,7 @@ static PHP_INI_MH(OnChangeMemoryLimit)
 		return ret;
 	}
 
-	if (MEMPROF_G(profile_flags).enabled && orig_zheap) {
+	if (MEMPROF_G(profile_flags).enabled) {
 		zend_mm_set_heap(orig_zheap);
 		zend_set_memory_limit(PG(memory_limit));
 		zend_mm_set_heap(zheap);
@@ -943,6 +916,7 @@ static PHP_INI_MH(OnChangeMemoryLimit)
 
 	return SUCCESS;
 }
+#endif
 
 static void memprof_enable(memprof_profile_flags * pf)
 {
@@ -964,16 +938,8 @@ static void memprof_enable(memprof_profile_flags * pf)
 	memprof_dumped = 0;
 
 	if (is_zend_mm()) {
-		/* There is no way to completely free a zend_mm_heap with custom
-		 * handlers, so we have to allocate it ourselves. We don't know the
-		 * actual size of a _zend_mm_heap struct, but this should be enough. */
-		zheap = malloc_check(zend_mm_heap_size);
-		memset(zheap, 0, zend_mm_heap_size);
-		zend_mm_set_custom_handlers(zheap, zend_malloc_handler, zend_free_handler, zend_realloc_handler);
-		orig_zheap = zend_mm_set_heap(zheap);
-	} else {
-		zheap = NULL;
-		orig_zheap = NULL;
+		observer = zend_mm_observer_register(zend_mm_get_heap(),
+			zend_malloc_observer, zend_free_observer, zend_realloc_observer);
 	}
 
 	old_zend_execute = zend_execute_fn;
@@ -991,9 +957,9 @@ static void memprof_disable()
 	zend_execute_fn = old_zend_execute;
 	zend_execute_internal = old_zend_execute_internal;
 
-	if (zheap) {
-		zend_mm_set_heap(orig_zheap);
-		free(zheap);
+	if (observer) {
+		zend_mm_observer_unregister(zend_mm_get_heap(), observer);
+		observer = NULL;
 	}
 
 	if (MEMPROF_G(profile_flags).native) {
@@ -1122,6 +1088,7 @@ ZEND_DLEXPORT zend_extension zend_extension_entry = {
 	STANDARD_ZEND_EXTENSION_PROPERTIES
 };
 
+#if 0
 ZEND_BEGIN_ARG_INFO_EX(arginfo_memprof_memory_get_usage, 0, 0, 0)
 	ZEND_ARG_INFO(0, real)
 ZEND_END_ARG_INFO()
@@ -1134,6 +1101,7 @@ const zend_function_entry memprof_function_overrides[] = {
 	PHP_FE_END    /* Must be the last line in memprof_function_overrides[] */
 };
 /* }}} */
+#endif
 
 /* {{{ memprof_module_entry
  */
@@ -1183,11 +1151,14 @@ PHP_INI_END()
  */
 PHP_MINIT_FUNCTION(memprof)
 {
+#if 0
 	zend_ini_entry * entry;
 	const zend_function_entry * fentry;
+#endif
 
 	REGISTER_INI_ENTRIES();
 
+#if 0
 	entry = zend_hash_str_find_ptr(EG(ini_directives), "memory_limit", sizeof("memory_limit")-1);
 
 	if (entry == NULL) {
@@ -1207,6 +1178,7 @@ PHP_MINIT_FUNCTION(memprof)
 			zend_error(E_WARNING, "memprof: Could not override %s(), return value from this function may be be accurate.", fentry->fname);
 		}
 	}
+#endif
 
 	return SUCCESS;
 }
@@ -1713,6 +1685,7 @@ PHP_FUNCTION(memprof_dump_pprof)
 }
 /* }}} */
 
+#if 0
 /* {{{ proto void memprof_memory_get_usage(bool real)
    Returns the current memory usage */
 PHP_FUNCTION(memprof_memory_get_usage)
@@ -1752,6 +1725,7 @@ PHP_FUNCTION(memprof_memory_get_peak_usage)
 	}
 }
 /* }}} */
+#endif
 
 /* {{{ proto bool memprof_enable()
    Enables memprof */
