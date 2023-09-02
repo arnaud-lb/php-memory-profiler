@@ -20,7 +20,7 @@
   <release>stable</release>
   <api>stable</api>
  </stability>
- <license>BSD</license>
+ <license>MIT</license>
  <notes>
   ## Improvements
   - PHP 8.1 support (@remicollet)
