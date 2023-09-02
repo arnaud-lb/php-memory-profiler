@@ -1,3 +1,7 @@
+.*
+
+!.gitignore
+
 *.dep
 *.la
 *.lo
