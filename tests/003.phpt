@@ -19,14 +19,14 @@ cmd: unknown
 positions: line
 events: MemorySize BlocksCount
 
-fl=/app/tests/common.php
+fl=%s/tests/common.php
 fn=Eater::eat
 1 8388640 1
 
 fl=
 fn=root
 1 3145760 1
-cfl=/app/tests/common.php
+cfl=%s/tests/common.php
 cfn=Eater::eat
 calls=1 1
 1 8388640 1
