@@ -119,7 +119,8 @@ size_t get_file_name(zend_execute_data * execute_data, char * buf, size_t buf_si
 	const char * file_name;
 
 	if (!execute_data) {
-		return snprintf(buf, buf_size, "");
+		buf[0] = '\0';
+		return 0;
 	}
 
 	func = EG(current_execute_data)->func;
@@ -130,7 +131,8 @@ size_t get_file_name(zend_execute_data * execute_data, char * buf, size_t buf_si
 		case ZEND_INTERNAL_FUNCTION:
 			return snprintf(buf, buf_size, "php:internal");
 		default:
-			return snprintf(buf, buf_size, "");
+			buf[0] = '\0';
+			return 0;
 	}
 }
 
