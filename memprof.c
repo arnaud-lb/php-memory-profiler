@@ -244,7 +244,7 @@ static zend_mm_heap * orig_zheap = NULL;
 #define ALLOC_LIST_INSERT_HEAD(head, elem) alloc_list_insert_head(head, elem)
 #define ALLOC_LIST_REMOVE(elem) alloc_list_remove(elem)
 
-ZEND_NORETURN static void out_of_memory() {
+ZEND_NORETURN static void out_of_memory(void) {
 	fprintf(stderr, "memprof: System out of memory, try lowering memory_limit\n");
 	exit(1);
 }
@@ -265,7 +265,7 @@ static inline void * realloc_check(void * ptr, size_t size) {
 	return newptr;
 }
 
-ZEND_NORETURN static void int_overflow() {
+ZEND_NORETURN static void int_overflow(void) {
 	fprintf(stderr, "memprof: Integer overflow in memory allocation, try lowering memory_limit\n");
 	exit(1);
 }
@@ -740,7 +740,7 @@ static void * zend_realloc_handler(void * ptr, size_t size)
 
 // Some extensions override zend_error_cb and don't call the previous
 // zend_error_cb, so memprof needs to be the last to override it
-static void memprof_late_override_error_cb() {
+static void memprof_late_override_error_cb(void) {
 	old_zend_error_cb = zend_error_cb;
 	zend_error_cb = memprof_zend_error_cb;
 	zend_error_cb_overridden = 1;
@@ -1001,7 +1001,7 @@ static void memprof_enable(memprof_profile_flags * pf)
 	track_mallocs = 1;
 }
 
-static void memprof_disable()
+static void memprof_disable(void)
 {
 	track_mallocs = 0;
 
@@ -1033,7 +1033,7 @@ static void memprof_disable()
 	}
 }
 
-static void disable_opcache()
+static void disable_opcache(void)
 {
 	zend_string *key = zend_string_init(ZEND_STRL("opcache.enable"), 0);
 	zend_alter_ini_entry_chars_ex(

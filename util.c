@@ -112,11 +112,7 @@ size_t get_function_name(zend_execute_data * execute_data, char * buf, size_t bu
 
 size_t get_file_name(zend_execute_data * execute_data, char * buf, size_t buf_size)
 {
-	size_t len;
 	zend_function * func;
-	zend_string * zname;
-	const char * include_type;
-	const char * file_name;
 
 	if (!execute_data) {
 		buf[0] = '\0';
