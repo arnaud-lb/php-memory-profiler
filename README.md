@@ -220,14 +220,14 @@ Here is a QcacheGrind screenshot:
 
 ### memprof_dump_pprof(resource $stream)
 
-Dumps the current profile in [pprof][4] format.
+Dumps the current profile in pprof format.
 
 ``` php
 <?php
 memprof_dump_pprof(fopen("profile.heap", "w"));
 ```
 
-The file can be visualized with [google-perftools][5]'s [``pprof``][4] tool.
+The file can be visualized with [google-perftools][5]'s ``pprof`` tool.
 
 Display annotated call-graph in web browser or in ``gv``:
 
@@ -244,6 +244,10 @@ Output one line per function, sorted by own memory usage:
 ```
 $ pprof --text profile.heap
 ```
+
+``pprof`` installation instructions:
+
+Ubuntu: `apt install google-perftools`. On Ubuntu the tool is named ``google-perftools``, so you need to call ``google-perftools --web profile.heap``, for example).
 
 ### memprof_dump_array()
 
@@ -357,7 +361,6 @@ See [INTERNALS.md][7]
 [1]: https://www.gnu.org/software/libc/manual/html_node/Hooks-for-Malloc.html#Hooks-for-Malloc
 [2]: https://kcachegrind.github.io/html/Home.html
 [3]: http://judy.sourceforge.net/index.html
-[4]: https://github.com/google/pprof
 [5]: https://github.com/gperftools/gperftools
 [6]: https://www.google.com/search?q=qcachegrind
 [7]: https://github.com/arnaud-lb/php-memory-profiler/blob/master/INTERNALS.md
