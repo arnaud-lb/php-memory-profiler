@@ -227,7 +227,7 @@ Dumps the current profile in pprof format.
 memprof_dump_pprof(fopen("profile.heap", "w"));
 ```
 
-The file can be visualized with [google-perftools][5]'s ``pprof`` tool.
+The file can be visualized with [google-perftools][5]'s ``pprof`` tool. (See bellow for installation instructions.) 
 
 Display annotated call-graph in web browser or in ``gv``:
 
@@ -245,9 +245,9 @@ Output one line per function, sorted by own memory usage:
 $ pprof --text profile.heap
 ```
 
-``pprof`` installation instructions:
+#### ``pprof`` installation instructions:
 
-Ubuntu: `apt install google-perftools`. On Ubuntu the tool is named ``google-perftools``, so you need to call ``google-perftools --web profile.heap``, for example).
+Ubuntu: `apt install google-perftools`. On Ubuntu the tool is named ``google-pprof``, so you need to replace ``pprof`` with ``google-pprof`` in the examples above.
 
 ### memprof_dump_array()
 
