@@ -23,6 +23,7 @@
 #include "php_memprof.h"
 #include "zend_extensions.h"
 #include "zend_exceptions.h"
+#include "zend_observer.h"
 #include <stdint.h>
 #include <sys/queue.h>
 #include "util.h"
@@ -198,10 +199,6 @@ static void (*old_free_hook) (void *ptr, const void *caller) = NULL;
 static void * (*old_memalign_hook) (size_t alignment, size_t size, const void *caller) = NULL;
 #endif /* HAVE_MALLOC_HOOKS */
 
-static void (*old_zend_execute)(zend_execute_data *execute_data);
-static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, zval *return_value);
-#define zend_execute_fn zend_execute_ex
-
 static void (*old_zend_error_cb)(int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message);
 static void (*rinit_zend_error_cb)(int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message);
 static zend_bool zend_error_cb_overridden;
@@ -214,6 +211,7 @@ static int track_mallocs = 0;
 
 static frame root_frame;
 static frame * current_frame;
+static bool current_frame_ignored;
 static alloc_list_head * current_alloc_list;
 static alloc_buckets current_alloc_buckets;
 
@@ -738,10 +736,41 @@ static void memprof_late_override_error_cb(void) {
 	zend_error_cb_overridden = 1;
 }
 
-static void memprof_zend_execute(zend_execute_data *execute_data)
-{
+static void memprof_observer_fcall_begin_handler(zend_execute_data *execute_data) {
+	ZEND_ASSERT(MEMPROF_G(profile_flags).enabled);
+
 	if (UNEXPECTED(!zend_error_cb_overridden)) {
 		memprof_late_override_error_cb();
+	}
+
+#ifdef MEMPROF_DEBUG_OBSERVER
+	if (execute_data->func->common.function_name) {
+		fprintf(stderr, "fcall begin %s\n", ZSTR_VAL(execute_data->func->common.function_name));
+	}
+#endif
+	if (execute_data->func->type == ZEND_INTERNAL_FUNCTION) {
+		if (&execute_data->func->internal_function == &zend_pass_function) {
+			current_frame_ignored = true;
+		} else if (execute_data->func->common.function_name) {
+			zend_string * name = execute_data->func->common.function_name;
+			if (ZSTR_LEN(name) == sizeof("call_user_func")-1
+					&& 0 == memcmp(name, "call_user_func", sizeof("call_user_func")))
+			{
+				current_frame_ignored = true;
+			} else if (ZSTR_LEN(name) == sizeof("call_user_func_array")-1
+					&& 0 == memcmp(name, "call_user_func_array", sizeof("call_user_func_array")))
+			{
+				current_frame_ignored = true;
+			}
+		} else {
+			current_frame_ignored = false;
+		}
+	} else {
+		current_frame_ignored = false;
+	}
+
+	if (current_frame_ignored) {
+		return;
 	}
 
 	WITHOUT_MALLOC_TRACKING {
@@ -751,57 +780,33 @@ static void memprof_zend_execute(zend_execute_data *execute_data)
 		current_alloc_list = &current_frame->allocs;
 
 	} END_WITHOUT_MALLOC_TRACKING;
-
-	old_zend_execute(execute_data);
-
-	if (MEMPROF_G(profile_flags).enabled) {
-		current_frame = current_frame->prev;
-		current_alloc_list = &current_frame->allocs;
-	}
 }
 
-static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, zval *return_value)
-{
-	int ignore = 0;
+static void memprof_observer_fcall_end_handler(zend_execute_data *execute_data, zval *retval) {
+	ZEND_ASSERT(MEMPROF_G(profile_flags).enabled);
 
-	if (UNEXPECTED(!zend_error_cb_overridden)) {
-		memprof_late_override_error_cb();
+#ifdef MEMPROF_DEBUG_OBSERVER
+	if (execute_data->func->common.function_name) {
+		fprintf(stderr, "fcall end %s\n", ZSTR_VAL(execute_data->func->common.function_name));
 	}
+#endif
 
-	if (&execute_data_ptr->func->internal_function == &zend_pass_function) {
-		ignore = 1;
-	} else if (execute_data_ptr->func->common.function_name) {
-		zend_string * name = execute_data_ptr->func->common.function_name;
-		if (ZSTR_LEN(name) == sizeof("call_user_func")-1
-				&& 0 == memcmp(name, "call_user_func", sizeof("call_user_func")))
-		{
-			ignore = 1;
-		} else if (ZSTR_LEN(name) == sizeof("call_user_func_array")-1
-				&& 0 == memcmp(name, "call_user_func_array", sizeof("call_user_func_array")))
-		{
-			ignore = 1;
-		}
+	if (current_frame_ignored) {
+		current_frame_ignored = false;
+		return;
 	}
+	current_frame = current_frame->prev;
+	current_alloc_list = &current_frame->allocs;
+}
 
-	WITHOUT_MALLOC_TRACKING {
-
-		if (!ignore) {
-			current_frame = get_or_create_frame(execute_data_ptr, current_frame);
-			current_frame->calls++;
-			current_alloc_list = &current_frame->allocs;
-		}
-
-	} END_WITHOUT_MALLOC_TRACKING;
-
-	if (!old_zend_execute_internal) {
-		execute_internal(execute_data_ptr, return_value);
+static zend_observer_fcall_handlers memprof_observer_fcall_init(zend_execute_data *execute_data) {
+	if (MEMPROF_G(profile_flags).enabled) {
+		return (zend_observer_fcall_handlers){
+			.begin = memprof_observer_fcall_begin_handler,
+			.end = memprof_observer_fcall_end_handler,
+		};
 	} else {
-		old_zend_execute_internal(execute_data_ptr, return_value);
-	}
-
-	if (!ignore && MEMPROF_G(profile_flags).enabled) {
-		current_frame = current_frame->prev;
-		current_alloc_list = &current_frame->allocs;
+		return (zend_observer_fcall_handlers){0};
 	}
 }
 
@@ -973,20 +978,12 @@ static void memprof_enable(memprof_profile_flags * pf)
 		orig_zheap = NULL;
 	}
 
-	old_zend_execute = zend_execute_fn;
-	old_zend_execute_internal = zend_execute_internal;
-	zend_execute_fn = memprof_zend_execute;
-	zend_execute_internal = memprof_zend_execute_internal;
-
 	track_mallocs = 1;
 }
 
 static void memprof_disable(void)
 {
 	track_mallocs = 0;
-
-	zend_execute_fn = old_zend_execute;
-	zend_execute_internal = old_zend_execute_internal;
 
 	if (zheap) {
 		zend_mm_set_heap(orig_zheap);
@@ -1199,6 +1196,8 @@ PHP_MINIT_FUNCTION(memprof)
 	const zend_function_entry * fentry;
 
 	REGISTER_INI_ENTRIES();
+
+	zend_observer_fcall_register(memprof_observer_fcall_init);
 
 	entry = zend_hash_str_find_ptr(EG(ini_directives), "memory_limit", sizeof("memory_limit")-1);
 

@@ -30,15 +30,9 @@ jobs:
             werror: 1
             xdebug: '3.2.2'
 
-          - php: '8.1.0'
-            os: 'ubuntu-20.04'
-            expect_native: 1
-            werror: 1
-            xdebug: '3.1.2'
-
-          - php: '8.1.0'
+          - php: '8.2.0'
             os: 'macos-13'
-            xdebug: '3.1.2'
+            xdebug: '3.2.2'
 
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ !!matrix.experimental }}

@@ -63,7 +63,23 @@ array(6) {
           ["calls"]=>
           int(1)
           ["called_functions"]=>
-          array(0) {
+          array(1) {
+            ["time"]=>
+            array(6) {
+              ["memory_size"]=>
+              int(0)
+              ["blocks_count"]=>
+              int(0)
+              ["memory_size_inclusive"]=>
+              int(0)
+              ["blocks_count_inclusive"]=>
+              int(0)
+              ["calls"]=>
+              int(1)
+              ["called_functions"]=>
+              array(0) {
+              }
+            }
           }
         }
         ["memprof_dump_array"]=>
@@ -158,7 +174,23 @@ array(6) {
           ["calls"]=>
           int(1)
           ["called_functions"]=>
-          array(0) {
+          array(1) {
+            ["time"]=>
+            array(6) {
+              ["memory_size"]=>
+              int(0)
+              ["blocks_count"]=>
+              int(0)
+              ["memory_size_inclusive"]=>
+              int(0)
+              ["blocks_count_inclusive"]=>
+              int(0)
+              ["calls"]=>
+              int(1)
+              ["called_functions"]=>
+              array(0) {
+              }
+            }
           }
         }
         ["memprof_dump_array"]=>
