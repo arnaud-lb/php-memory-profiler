@@ -19,6 +19,12 @@ jobs:
                 expect_native: 1
                 werror: 1
 
+              - php: '8.1.0'
+                os: 'ubuntu-18.04'
+                expect_native: 1
+                werror: 1
+                arch: i386
+
               - php: '8.0.0'
                 os: 'ubuntu-20.04'
                 expect_native: 1
@@ -42,6 +48,7 @@ jobs:
             MEMORY_CHECK: ${{ matrix.memcheck }}
             WERROR: ${{ matrix.werror }}
             MEMPROF_EXPECT_NATIVE_TRACKING: ${{ matrix.expect_native }}
+            BUILD_ARCH: ${{ matrix.arch || 'amd64' }}
         steps:
             - name: 'Check out repository'
               uses: 'actions/checkout@v2'
@@ -51,7 +58,10 @@ jobs:
             - uses: actions/cache@v2
               with:
                   path: ~/build-cache/php
-                  key: ${{ runner.os }}-${{ matrix.php }}-${{ matrix.memcheck }}
+                  key: ${{ runner.os }}-${{matrix.arch}}-${{ matrix.php }}-${{ matrix.memcheck }}
+
+            - name: 'Setup'
+              run: './ext/.github/workflows/test/setup.sh'
 
             - name: 'Build PHP'
               run: './ext/.github/workflows/test/build-php.sh'
