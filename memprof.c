@@ -1510,7 +1510,7 @@ static zend_bool dump_callgrind(php_stream * stream) {
 		stream_printf(stream, "version: 1\n")								&&
 		stream_printf(stream, "cmd: unknown\n")								&&
 		stream_printf(stream, "positions: line\n")							&&
-		stream_printf(stream, "events: Memory_Size_(bytes) Call_Count\n")	&&
+		stream_printf(stream, "events: Memory_Size_(bytes) BlocksCount\n")	&&
 		stream_printf(stream, "\n")											&&
 
 		dump_frame_callgrind(stream, &root_frame, "root", &total_size, &total_count) &&
