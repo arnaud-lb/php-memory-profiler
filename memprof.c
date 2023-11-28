@@ -851,7 +851,6 @@ static char * generate_filename(const char * format) {
 static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
 {
 	char * filename = NULL;
-	const char * output_format = MEMPROF_G(output_dir);
 	php_stream * stream;
 	zend_bool error = 0;
 #if PHP_VERSION_ID < 80000
@@ -866,8 +865,8 @@ static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
 	zend_mm_set_heap(zheap);
 
 	WITHOUT_MALLOC_TRACKING {
-		if (strcmp(output_format, "callgrind") != 0) {
-			filename = generate_filename("callgrind");
+		if (MEMPROF_G(output_format) == FORMAT_CALLGRIND) {
+			filename = generate_filename(MEMPROF_OUTPUT_FORMAT_CALLGRIND);
 			stream = php_stream_open_wrapper_ex(filename, "w", 0, NULL, NULL);
 			if (stream != NULL) {
 				error = !dump_callgrind(stream);
@@ -875,8 +874,8 @@ static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
 			} else {
 				error = 1;
 			}
-		} else if (strcmp(output_format, "pprof") != 0) {
-			filename = generate_filename("pprof");
+		} else if (MEMPROF_G(output_format) == FORMAT_PPROF) {
+			filename = generate_filename(MEMPROF_OUTPUT_FORMAT_PPROF);
 			stream = php_stream_open_wrapper_ex(filename, "w", 0, NULL, NULL);
 			if (stream != NULL) {
 				error = !dump_pprof(stream);
@@ -884,9 +883,6 @@ static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
 			} else {
 				error = 1;
 			}
-		} else {
-			new_message = strpprintf(0, "%s (memprof failed dumping with format %s, please check the output format)", message_chr, output_format);
-			error = 1;
 		}
 
 		if (filename != NULL) {
@@ -1193,11 +1189,25 @@ ZEND_GET_MODULE(memprof)
 #	endif
 #endif
 
+static ZEND_INI_MH(onUpdateOutputFormat)
+{
+	if (zend_string_equals_literal_ci(new_value, MEMPROF_OUTPUT_FORMAT_CALLGRIND)) {
+		MEMPROF_G(output_format) = FORMAT_CALLGRIND;
+	} else if (zend_string_equals_literal_ci(new_value, MEMPROF_OUTPUT_FORMAT_PPROF)) {
+		MEMPROF_G(output_format) = FORMAT_PPROF;
+	} else {
+		zend_error_noreturn(E_ERROR, "Invalid memprof.output_format setting. Should be \"callgrind\" or \"pprof\"");
+		return FAILURE;
+	}
+
+	return SUCCESS;
+}
+
 /* {{{ PHP_INI_BEGIN
  */
 PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memprof.output_dir", MEMPROF_TEMP_DIR, PHP_INI_ALL, OnUpdateStringUnempty, output_dir, zend_memprof_globals, memprof_globals)
-	STD_PHP_INI_ENTRY("memprof.output_format", "callgrind", PHP_INI_ALL, OnUpdateStringUnempty, output_format, zend_memprof_globals, memprof_globals)
+	STD_PHP_INI_ENTRY("memprof.output_format", MEMPROF_OUTPUT_FORMAT_CALLGRIND, PHP_INI_ALL, onUpdateOutputFormat, output_format, zend_memprof_globals, memprof_globals)
 PHP_INI_END()
 /* }}} */
 
@@ -1310,7 +1320,7 @@ PHP_MINFO_FUNCTION(memprof)
 PHP_GINIT_FUNCTION(memprof)
 {
 	memprof_globals->output_dir = NULL;
-	memprof_globals->output_format = "callgrind";
+	memprof_globals->output_format = FORMAT_CALLGRIND;
 }
 /* }}} */
 
