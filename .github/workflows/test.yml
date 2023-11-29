@@ -21,7 +21,7 @@ jobs:
             xdebug: '3.1.2'
 
           - php: '8.1.0'
-            os: 'macos-10.15'
+            os: 'macos-13'
             xdebug: '3.1.2'
 
           - php: '8.0.0'
