@@ -123,8 +123,6 @@
 
 #else /* HAVE_MALLOC_HOOKS */
 
-#	warning No support for malloc hooks, this build will not track persistent allocations
-
 #	define MALLOC_HOOK_CHECK_NOT_OWN()
 #	define MALLOC_HOOK_IS_SET() (__malloc_hook == malloc_hook)
 #	define MALLOC_HOOK_RESTORE_OLD()
