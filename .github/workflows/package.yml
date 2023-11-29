@@ -1,25 +1,25 @@
 name: 'Package'
 
 on:
-    pull_request:
+  pull_request:
 
 jobs:
-    package:
-        name: 'Package'
-        runs-on: 'ubuntu-20.04'
-        steps:
-            - name: 'Check out repository'
-              uses: 'actions/checkout@v2'
-              with:
-                  path: 'ext'
+  package:
+    name: 'Package'
+    runs-on: 'ubuntu-22.04'
+    steps:
+      - name: 'Check out repository'
+        uses: 'actions/checkout@v4'
+        with:
+          path: 'ext'
 
-            - name: 'Install dependencies'
-              run: 'sudo apt-get -y install php7.4-dev libjudy-dev'
+      - name: 'Install dependencies'
+        run: 'sudo apt-get -y install php8.1-dev libjudy-dev'
 
-            - name: 'Package and verify package'
-              run: './ext/.github/workflows/package/package.sh'
+      - name: 'Package and verify package'
+        run: './ext/.github/workflows/package/package.sh'
 
-            - name: 'Archive package'
-              uses: 'actions/upload-artifact@v2'
-              with:
-                  path: 'ext/memprof.tgz'
+      - name: 'Archive package'
+        uses: 'actions/upload-artifact@v3'
+        with:
+          path: 'ext/memprof.tgz'
