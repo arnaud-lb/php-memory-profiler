@@ -1,12 +1,16 @@
 .*
 
+!.editorconfig
 !.gitignore
+
+tests/*
+
+!tests/*.phpt
 
 *.dep
 *.la
 *.lo
-.deps
-.libs
+
 Makefile
 Makefile.fragments
 Makefile.global
@@ -35,11 +39,4 @@ missing
 mkinstalldirs
 modules
 run-tests.php
-tests/*.diff
-tests/*.exp
-tests/*.log
-tests/*.out
-tests/*.php
-tests/*.sh
-tests/phpt.*
 tmp-php.ini

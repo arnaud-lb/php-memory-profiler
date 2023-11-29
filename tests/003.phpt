@@ -17,7 +17,7 @@ Warning: Calling memprof_enable() manually may not work as expected because of P
 version: 1
 cmd: unknown
 positions: line
-events: MemorySize BlocksCount
+events: Memory_Size_(bytes) BlocksCount
 
 fl=%s/tests/common.php
 fn=Eater::eat
