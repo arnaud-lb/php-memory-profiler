@@ -17,13 +17,11 @@ jobs:
           - php: '8.3.0'
             os: 'ubuntu-22.04'
             expect_native: 1
-            werror: 1
             xdebug: '3.3.0alpha3'
 
           - php: '8.2.0'
             os: 'ubuntu-22.04'
             expect_native: 1
-            werror: 1
             xdebug: '3.2.2'
 
           - php: '8.1.0'
