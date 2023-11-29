@@ -24,4 +24,4 @@ binary=php://stdout
 0x0000000000000038 memprof_dump_pprof
 ---
 --- profile
-%s
+%a
