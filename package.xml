@@ -55,6 +55,8 @@
      <file name="007.phpt" role="test" />
      <file name="autodump-disabled.phpt" role="test" />
      <file name="autodump-failure.phpt" role="test" />
+     <file name="autodump-format-failure.phpt" role="test" />
+     <file name="autodump-pprof.phpt" role="test" />
      <file name="autodump.phpt" role="test" />
      <file name="autodump-xdebug.phpt" role="test" />
      <file name="common.php" role="test" />
