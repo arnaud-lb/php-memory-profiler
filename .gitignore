@@ -1,10 +1,14 @@
+# Ignore all hidden files unless explicitly allowed
 .*
 
+# Allowed hidden files
 !.editorconfig
 !.gitignore
 
+# Ignore all files in test/ unless explicitly allowed
 tests/*
 
+# Allow test cases only
 !tests/*.phpt
 
 *.dep
