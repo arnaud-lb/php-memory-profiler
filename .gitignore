@@ -1,20 +1,12 @@
-# Ignore all hidden files unless explicitly allowed
 .*
 
-# Allowed hidden files
-!.editorconfig
 !.gitignore
-
-# Ignore all files in test/ unless explicitly allowed
-tests/*
-
-# Allow test cases only
-!tests/*.phpt
 
 *.dep
 *.la
 *.lo
-
+.deps
+.libs
 Makefile
 Makefile.fragments
 Makefile.global
@@ -43,4 +35,11 @@ missing
 mkinstalldirs
 modules
 run-tests.php
+tests/*.diff
+tests/*.exp
+tests/*.log
+tests/*.out
+tests/*.php
+tests/*.sh
+tests/phpt.*
 tmp-php.ini
