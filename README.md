@@ -20,15 +20,19 @@ The extension tracks the allocation and release of memory blocks to report the a
 
 ### Dependencies
 
-php-memprof depends on libjudy. On Linux-based distributions the dependency can be
-installed with:
+php-memprof depends on libjudy and sys/queue.h.
+
+On Debian-based distributions the dependencies can be installed with:
 
     # Debian or Ubuntu:
     apt install libjudy-dev
-    # Alpine Linux
-    apk add judy-dev
 
-On MacOS the dependency can be installed with:
+On Alpine:
+
+    # Alpine
+    apk add judy-dev bsd-compat-headers
+
+On MacOS:
 
     # install libjudy dependency:
     brew install traildb/judy/judy
