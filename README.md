@@ -37,16 +37,31 @@ On MacOS:
     # install libjudy dependency:
     brew install traildb/judy/judy
 
+### Installing with [PIE](https://github.com/php/pie)
+
+Make sure to install [dependencies](#dependencies), and then:
+
+    pie install arnaud-lb/memprof
+
+> **Note** If libjudy is installed in a non-standard path (not /usr or /usr/local), you need to specify it via the `--with-judy-dir` option.
+> 
+> Example on MacOS:
+> ```
+> pecl install memprof --with-judy-dir=$(brew --prefix traildb/judy/judy)
+> ```
+
 ### Installing with PECL
 
 Make sure to install [dependencies](#dependencies), and then:
 
     pecl install memprof
 
-On MacOS:
-    JUDY_DIR=$(brew --prefix traildb/judy/judy) pecl install memprof
-
-> **Note** If libjudy is installed in a non-standard path (not /usr or /usr/local), please use the manual installation method bellow.
+> **Note** If libjudy is installed in a non-standard path (not /usr or /usr/local), you need to specify it via the `JUDY_DEV` environment variable.
+> 
+> Example on MacOS:
+> ```
+> JUDY_DIR=$(brew --prefix traildb/judy/judy) pecl install memprof
+> ```
 
 ### Installing manually
 
