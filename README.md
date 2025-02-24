@@ -218,8 +218,6 @@ The output file format is defined with the `memprof.output_format` ini setting. 
 - `callgrind` (default)
 - `pprof`
 
-**Note**: this may only be available when the extension is built from source (and not installed with pecl), as of https://github.com/arnaud-lb/php-memory-profiler/issues/101.
-
 ## Functions documentation
 
 ### memprof_enabled()
