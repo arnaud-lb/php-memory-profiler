@@ -32,11 +32,11 @@
 #endif
 #include <assert.h>
 
-#if PHP_VERSION_ID < 80000
-#include "memprof_legacy_arginfo.h"
-#else
-#include "memprof_arginfo.h"
+#if PHP_VERSION_ID < 80100
+# error "Unsupported PHP version (min supported version: 8.1.0)"
 #endif
+
+#include "memprof_arginfo.h"
 
 #define MEMPROF_ENV_PROFILE "MEMPROF_PROFILE"
 #define MEMPROF_FLAG_NATIVE "native"
@@ -202,24 +202,10 @@ static void (*old_zend_execute)(zend_execute_data *execute_data);
 static void (*old_zend_execute_internal)(zend_execute_data *execute_data_ptr, zval *return_value);
 #define zend_execute_fn zend_execute_ex
 
-#if   PHP_VERSION_ID < 70200 /* PHP 7.1 */
-#	define MEMPROF_ZEND_ERROR_CB_ARGS int type, const char *error_filename, const uint error_lineno, const char *format, va_list args
-#	define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, format, args
-#elif PHP_VERSION_ID < 80000 /* PHP 7.2 - 7.4 */
-#	define MEMPROF_ZEND_ERROR_CB_ARGS int type, const char *error_filename, const uint32_t error_lineno, const char *format, va_list args
-#	define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, format, args
-#elif PHP_VERSION_ID < 80100 /* PHP 8.0 */
-#	define MEMPROF_ZEND_ERROR_CB_ARGS int type, const char *error_filename, const uint32_t error_lineno, zend_string *message
-#	define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, message
-#else                        /* PHP 8.1 */
-#	define MEMPROF_ZEND_ERROR_CB_ARGS int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message
-#	define MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU type, error_filename, error_lineno, message
-#endif
-
-static void (*old_zend_error_cb)(MEMPROF_ZEND_ERROR_CB_ARGS);
-static void (*rinit_zend_error_cb)(MEMPROF_ZEND_ERROR_CB_ARGS);
+static void (*old_zend_error_cb)(int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message);
+static void (*rinit_zend_error_cb)(int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message);
 static zend_bool zend_error_cb_overridden;
-static void memprof_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS);
+static void memprof_zend_error_cb(int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message);
 
 static PHP_INI_MH((*origOnChangeMemoryLimit)) = NULL;
 
@@ -819,7 +805,7 @@ static void memprof_zend_execute_internal(zend_execute_data *execute_data_ptr, z
 	}
 }
 
-static zend_bool should_autodump(int error_type, const char *message) {
+static zend_bool should_autodump(int error_type, zend_string *message) {
 	if (EXPECTED(error_type != E_ERROR)) {
 		return 0;
 	}
@@ -828,7 +814,7 @@ static zend_bool should_autodump(int error_type, const char *message) {
 		return 0;
 	}
 
-	if (EXPECTED(strncmp(MEMORY_LIMIT_ERROR_PREFIX, message, strlen(MEMORY_LIMIT_ERROR_PREFIX)) != 0)) {
+	if (EXPECTED(strncmp(MEMORY_LIMIT_ERROR_PREFIX, ZSTR_VAL(message), strlen(MEMORY_LIMIT_ERROR_PREFIX)) != 0)) {
 		return 0;
 	}
 
@@ -854,16 +840,12 @@ static char * generate_filename(const char * format) {
 	return filename;
 }
 
-static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
+static void memprof_zend_error_cb_dump(int type, zend_string *error_filename,
+		const uint32_t error_lineno, zend_string *message)
 {
 	char * filename = NULL;
 	php_stream * stream;
 	zend_bool error = 0;
-#if PHP_VERSION_ID < 80000
-	const char * message_chr = format;
-#else
-	const char * message_chr = ZSTR_VAL(message);
-#endif
 	zend_string * new_message = NULL;
 
 	zend_mm_set_heap(orig_zheap);
@@ -893,19 +875,15 @@ static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
 
 		if (filename != NULL) {
 			if (error == 0) {
-				new_message = strpprintf(0, "%s (memprof dumped to %s)", message_chr, filename);
+				new_message = strpprintf(0, "%s (memprof dumped to %s)", ZSTR_VAL(message), filename);
 			} else {
-				new_message = strpprintf(0, "%s (memprof failed dumping to %s, please check file permissions or disk capacity)", message_chr, filename);
+				new_message = strpprintf(0, "%s (memprof failed dumping to %s, please check file permissions or disk capacity)", ZSTR_VAL(message), filename);
 			}
 			efree(filename);
 		}
 
 		if (new_message != NULL) {
-#if PHP_VERSION_ID < 80000
-			format = ZSTR_VAL(new_message);
-#else
 			message = new_message;
-#endif
 		}
 	} END_WITHOUT_MALLOC_TRACKING;
 
@@ -913,7 +891,7 @@ static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
 	zend_set_memory_limit(PG(memory_limit));
 	zend_mm_set_heap(zheap);
 
-	old_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
+	old_zend_error_cb(type, error_filename, error_lineno, message);
 
 	WITHOUT_MALLOC_TRACKING {
 		if (new_message != NULL) {
@@ -923,25 +901,21 @@ static void memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS)
 
 }
 
-static void memprof_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS)
+static void memprof_zend_error_cb(int type, zend_string *error_filename,
+		const uint32_t error_lineno, zend_string *message)
 {
-#if PHP_VERSION_ID < 80000
-	const char * message_chr = format;
-#else
-	const char * message_chr = ZSTR_VAL(message);
-#endif
-
 	if (EXPECTED(!MEMPROF_G(profile_flags).enabled)) {
-		old_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
+		old_zend_error_cb(type, error_filename, error_lineno, message);
 		return;
 	}
 
-	if (EXPECTED(!should_autodump(type, message_chr))) {
-		old_zend_error_cb(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
+	if (EXPECTED(!should_autodump(type, message))) {
+		old_zend_error_cb(type, error_filename, error_lineno, message);
 		return;
 	}
 
-	return memprof_zend_error_cb_dump(MEMPROF_ZEND_ERROR_CB_ARGS_PASSTHRU);
+	return memprof_zend_error_cb_dump(type, error_filename, error_lineno,
+			message);
 }
 
 static PHP_INI_MH(OnChangeMemoryLimit)

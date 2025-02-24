@@ -39,21 +39,6 @@ jobs:
             os: 'macos-13'
             xdebug: '3.1.2'
 
-          - php: '8.0.0'
-            os: 'ubuntu-20.04'
-            expect_native: 1
-            xdebug: '3.1.2'
-
-          - php: '7.4.0'
-            os: 'ubuntu-20.04'
-            expect_native: 1
-            xdebug: '3.1.2'
-
-          - php: '7.3.0'
-            os: 'ubuntu-20.04'
-            expect_native: 1
-            xdebug: '3.1.2'
-
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ !!matrix.experimental }}
     env:
