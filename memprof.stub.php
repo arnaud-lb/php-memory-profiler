@@ -9,8 +9,6 @@ function memprof_enabled(): bool {}
 
 function memprof_enabled_flags(): array {}
 
-function memprof_enable(): bool {}
-
 function memprof_disable(): bool {}
 
 function memprof_dump_array(): array {}
