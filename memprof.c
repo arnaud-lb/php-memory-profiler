@@ -648,7 +648,15 @@ static void * memalign_hook(size_t alignment, size_t size, const void *caller)
 	track_mallocs = ___old_track_mallocs; \
 } while (0)
 
-static void * zend_malloc_handler(size_t size)
+#if PHP_VERSION_ID >= 80400
+# define MM_HANDLER_FILE_LINE_DC ZEND_FILE_LINE_DC
+# define MM_HANDLER_FILE_LINE_ORIG_DC ZEND_FILE_LINE_ORIG_DC
+#else
+# define MM_HANDLER_FILE_LINE_DC
+# define MM_HANDLER_FILE_LINE_ORIG_DC
+#endif
+
+static void * zend_malloc_handler(size_t size MM_HANDLER_FILE_LINE_DC MM_HANDLER_FILE_LINE_ORIG_DC)
 {
 	void *result;
 
@@ -671,7 +679,7 @@ static void * zend_malloc_handler(size_t size)
 	return result;
 }
 
-static void zend_free_handler(void * ptr)
+static void zend_free_handler(void * ptr MM_HANDLER_FILE_LINE_DC MM_HANDLER_FILE_LINE_ORIG_DC)
 {
 	assert(MEMPROF_G(profile_flags).enabled);
 
@@ -693,7 +701,7 @@ static void zend_free_handler(void * ptr)
 	} END_WITHOUT_MALLOC_HOOKS;
 }
 
-static void * zend_realloc_handler(void * ptr, size_t size)
+static void * zend_realloc_handler(void * ptr, size_t size MM_HANDLER_FILE_LINE_DC MM_HANDLER_FILE_LINE_ORIG_DC)
 {
 	void *result;
 	alloc *a;
