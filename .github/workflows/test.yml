@@ -12,6 +12,7 @@ jobs:
   tests:
     name: 'Tests'
     strategy:
+      fail-fast: false
       matrix:
         include:
           - php: '8.4.0'

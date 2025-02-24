@@ -1765,28 +1765,6 @@ PHP_FUNCTION(memprof_memory_get_peak_usage)
 }
 /* }}} */
 
-/* {{{ proto bool memprof_enable()
-   Enables memprof */
-PHP_FUNCTION(memprof_enable)
-{
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "") == FAILURE) {
-		return;
-	}
-
-	if (MEMPROF_G(profile_flags).enabled) {
-		zend_throw_exception(EG(exception_class), "memprof_enable(): memprof is already enabled", 0);
-		return;
-	}
-
-	zend_error(E_WARNING, "Calling memprof_enable() manually may not work as expected because of PHP optimizations. Prefer using MEMPROF_PROFILE=1 as environment variable, GET, or POST");
-
-	MEMPROF_G(profile_flags).enabled = 1;
-	memprof_enable(&MEMPROF_G(profile_flags));
-
-	RETURN_TRUE;
-}
-/* }}} */
-
 /* {{{ proto bool memprof_disable()
    Disables memprof */
 PHP_FUNCTION(memprof_disable)
