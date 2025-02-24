@@ -1,0 +1,20 @@
+{
+    "name": "arnaud-lb/memprof",
+    "type": "php-ext",
+    "license": "MIT",
+    "description": "A memory profiler for PHP",
+    "require": {
+        "php": ">= 8.1.0"
+    },
+    "php-ext": {
+        "extension-name": "memprof",
+        "support-zts": false,
+        "configure-options": [
+            {
+                "name": "with-judy-dir",
+                "description": "Use system libjudy",
+                "needs-value": true
+            }
+        ]
+    }
+}
