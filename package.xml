@@ -10,10 +10,10 @@
   <email>lbarnaud@php.net</email>
   <active>yes</active>
  </lead>
- <date>2022-01-07</date>
+ <date>2025-02-24</date>
  <time>12:00:00</time>
  <version>
-  <release>3.0.2</release>
+  <release>3.1.0</release>
   <api>1.0.0</api>
  </version>
  <stability>
@@ -23,14 +23,10 @@
  <license>MIT</license>
  <notes>
   ## Improvements
-  - PHP 8.1 support (@remicollet)
-  - Added parameter types and return types (@remicollet)
-  - dump_on_limit: Append the profile filename to the "Allowed memory size of %d
-    bytes exhausted" error message (@arnaud-lb)
-  - Added memprof_version() function (@arnaud-lb)
-
-  ## Bugfixes
-  - Fixed compatibility issue with xdebug (@arnaud-lb)
+  - Use filename for script and binary instead of /todo.php (@samlitowitz, #92)
+  - Allow output_format to be defined from ini setting (@gaelreyrol, #97)
+  - Add units to Callgrind label for memory size and update `BlockCount` to `Call_Count` (@samlitowitz, #95)
+  - Add support for PIE
  </notes>
  <contents>
   <dir name="/">
@@ -80,6 +76,30 @@
  <providesextension>memprof</providesextension>
  <extsrcrelease />
  <changelog>
+  <release>
+   <date>2022-01-07</date>
+   <time>12:00:00</time>
+   <version>
+    <release>3.0.2</release>
+    <api>1.0.0</api>
+   </version>
+   <stability>
+    <release>stable</release>
+    <api>stable</api>
+   </stability>
+   <license>MIT</license>
+   <notes>
+    ## Improvements
+    - PHP 8.1 support (@remicollet)
+    - Added parameter types and return types (@remicollet)
+    - dump_on_limit: Append the profile filename to the "Allowed memory size of %d
+    bytes exhausted" error message (@arnaud-lb)
+    - Added memprof_version() function (@arnaud-lb)
+
+    ## Bugfixes
+    - Fixed compatibility issue with xdebug (@arnaud-lb)
+   </notes>
+  </release>
   <release>
    <date>2021-03-29</date>
    <time>12:00:00</time>
