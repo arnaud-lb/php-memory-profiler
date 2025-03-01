@@ -13,13 +13,22 @@ $b = Eater::eat();
 memprof_dump_callgrind(STDOUT);
 
 --EXPECTF--
+
 version: 1
 cmd: unknown
 positions: line
 events: Memory_Size_(bytes) BlocksCount
 
+fl=php:internal
+fn=time
+1 0 0
+
 fl=%scommon.php
 fn=require %scommon.php
+1 0 0
+cfl=php:internal
+cfn=time
+calls=1 1
 1 0 0
 
 fl=php:internal
